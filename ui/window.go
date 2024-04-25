@@ -23,6 +23,16 @@ type Figure struct {
 	frame image.Rectangle
 	color color.RGBA
 }
+type MoveTFigures interface {
+	MoveTFigures(tfs []event.TFigure, t screen.Texture)
+}
+
+type ElementsToDraw struct {
+	tfigures []DrawableElement
+	backgrounds []DrawableElement
+	brects []DrawableElement
+}
+
 
 func (fg *Figure) draw(w screen.Window) {
 	horizontal := fg.frame
