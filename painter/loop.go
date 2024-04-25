@@ -8,6 +8,26 @@ import (
 	"golang.org/x/exp/shiny/screen"
 )
 
+type eventQueue struct {
+	events chan any
+	m sync.Mutex
+}
+
+func (q *eventQueue) Push(e any) {
+	q.m.Lock()
+
+	go func() {
+		q.events <- e
+		q.m.Unlock()
+	}()
+}
+
+func (q *eventQueue) Pull() any {
+	e := <- q.events
+	return e
+}
+
+
 // Receiver отримує текстуру, яка була підготовлена в результаті виконання команд у циелі подій.
 type Receiver interface {
 	Update(t screen.Texture)
@@ -21,6 +41,9 @@ type Loop struct {
 	prev screen.Texture // текстура, яка була відправленя останнього разу у Receiver
 
 	mq messageQueue
+	queue eventQueue
+
+	terminate bool
 
 	stop    chan struct{}
 	stopReq bool
@@ -30,43 +53,41 @@ var size = image.Pt(400, 400)
 
 // Start запускає цикл подій. Цей метод потрібно запустити до того, як викликати на ньому будь-які інші методи.
 func (l *Loop) Start(s screen.Screen) {
-	l.next, _ = s.NewTexture(size)
-	l.prev, _ = s.NewTexture(size)
-
-	l.stop = make(chan struct{})
-
 	go func() {
-		for !l.stopReq || !l.mq.empty() {
-			op := l.mq.pull()
-			if update := op.Do(l.next); update {
-				l.Receiver.Update(l.next)
-				l.next, l.prev = l.prev, l.next
-			}
+		l.queue.events = make(chan any)
+
+		l.terminate = false
+		var prelock sync.Mutex
+		var consistent sync.Mutex
+
+		for !l.terminate {
+			EventObject := l.queue.Pull()
+			consistent.Lock()
+
+			go func() {
+				prelock.Lock()
+
+				consistent.Unlock()
+
+				l.Receiver.Receive(EventObject)
+
+				prelock.Unlock()
+			}()
 		}
-		close(l.stop)
+
+		close(l.queue.events)
 	}()
 }
 
-// Post додає нову операцію у внутрішню чергу.
-func (l *Loop) Post(op Operation) {
-	l.mq.push(op)
+func (l *Loop) PostEvent(Event any) {
+	l.queue.Push(Event)
 }
 
-func (l *Loop) PostOps(ops []Operation) {
-	for _, op := range ops {
-		fmt.Println("op", op)
-		l.Post(op)
+func (l *Loop) PostEvents(Events []any) {
+	for _, Event := range Events {
+		l.PostEvent(Event)
 	}
 }
-
-// StopAndWait сигналізує про необхідність завершити цикл та блокується до моменту його повної зупинки.
-func (l *Loop) StopAndWait() {
-	l.Post(OperationFunc(func(screen.Texture) {
-		l.stopReq = true
-	}))
-	<-l.stop
-}
-
 type messageQueue struct {
 	ops     []Operation
 	mu      sync.Mutex
