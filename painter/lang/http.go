@@ -26,6 +26,11 @@ func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
 			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		if len(events) != 0 {
+			go func() {
+			loop.PostEvents(events)
+			}()
+		}
 
 		fmt.Println("before:", cmds)
 		loop.PostOps(painter.OperationList(cmds))
