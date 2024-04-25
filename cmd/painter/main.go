@@ -6,6 +6,7 @@ import (
 	"github.com/roman-mazur/architecture-lab-3/painter"
 	"github.com/roman-mazur/architecture-lab-3/painter/lang"
 	"github.com/roman-mazur/architecture-lab-3/ui"
+	// "fmt"
 )
 
 func main() {
@@ -29,5 +30,6 @@ func main() {
 	}()
 
 	pv.Main()
+	// fmt.Println("here we go")
 	opLoop.StopAndWait()
 }

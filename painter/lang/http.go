@@ -1,12 +1,14 @@
 package lang
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 
 	"github.com/roman-mazur/architecture-lab-3/painter"
+	// "bufio"
 )
 
 // HttpHandler конструює обробник HTTP запитів, який дані з запиту віддає у Parser, а потім відправляє отриманий список
@@ -25,7 +27,8 @@ func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
 			return
 		}
 
-		loop.Post(painter.OperationList(cmds))
+		fmt.Println("before:", cmds)
+		loop.PostOps(painter.OperationList(cmds))
 		rw.WriteHeader(http.StatusOK)
 	})
 }
