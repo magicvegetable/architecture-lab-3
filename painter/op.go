@@ -1,9 +1,12 @@
 package painter
 
-import "image"
-import "fmt"
-import "golang.org/x/exp/shiny/screen"
-import "image/color"
+import (
+	"fmt"
+	"image"
+	"image/color"
+
+	"golang.org/x/exp/shiny/screen"
+)
 
 type Operation interface{}
 
@@ -185,7 +188,7 @@ func NewBRect(x1, y1, x2, y2 float64) BRect {
 type Move struct {
 	Dest                Point
 	originalTextureRect *image.Rectangle
-	Range []*TFigure
+	Range               []*TFigure
 }
 
 func (mv *Move) SetRange(tfs []*TFigure) {
@@ -196,19 +199,6 @@ func (mv *Move) SetRange(tfs []*TFigure) {
 func (mv *Move) Move(t screen.Texture) {
 	tfs := mv.Range
 
-	if mv.originalTextureRect == nil {
-		fullRect := t.Bounds()
-		mv.originalTextureRect = &fullRect
-	}
-
-	realDest := convertPointToImagePoint(mv.Dest, *mv.originalTextureRect)
-
-	for _, tf := range tfs {
-		tf.Move(realDest)
-	}
-}
-
-func (mv *Move) MoveTFigures(tfs []TFigure, t screen.Texture) {
 	if mv.originalTextureRect == nil {
 		fullRect := t.Bounds()
 		mv.originalTextureRect = &fullRect
