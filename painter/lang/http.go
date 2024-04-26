@@ -21,7 +21,7 @@ func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
 
 		parserM.Lock()
 
-		events, err := p.ParseEvents(in)
+		events, err := p.ParseOperations(in)
 
 		if err != nil {
 			// TODO: handle errors

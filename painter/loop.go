@@ -6,27 +6,58 @@ import (
 	"golang.org/x/exp/shiny/screen"
 )
 
-type eventQueue struct {
-	events chan any
-	m      sync.Mutex
+type queueElement struct {
+	value Operation
+	next  *queueElement
 }
 
-func (q *eventQueue) Push(e any) {
+type eventQueue struct {
+	m sync.Mutex
+
+	head, tail *queueElement
+
+	blocked chan struct{}
+}
+
+func (q *eventQueue) Push(op Operation) {
+	defer q.m.Unlock()
 	q.m.Lock()
 
-	go func() {
-		q.events <- e
-		q.m.Unlock()
-	}()
+	element := &queueElement{value: op, next: nil}
+	if q.head == nil {
+		q.head = element
+		q.tail = element
+	} else {
+		q.tail.next = element
+		q.tail = element
+	}
+
+	if q.blocked != nil {
+		close(q.blocked)
+		q.blocked = nil
+	}
+
 }
 
-func (q *eventQueue) Pull() any {
-	e := <-q.events
+func (q *eventQueue) Pull() Operation {
+	defer q.m.Unlock()
+	q.m.Lock()
+
+	if q.head == nil {
+		q.blocked = make(chan struct{})
+		q.m.Unlock()
+
+		<-q.blocked
+		q.m.Lock()
+	}
+
+	e := q.head.value
+	q.head = q.head.next
 	return e
 }
 
 type Receiver interface {
-	Receive(EventObject any)
+	Receive(op Operation)
 }
 
 type Loop struct {
@@ -39,37 +70,21 @@ type Loop struct {
 
 func (l *Loop) Start(s screen.Screen) {
 	go func() {
-		l.queue.events = make(chan any)
-
 		l.terminate = false
-		var prelock sync.Mutex
-		var consistent sync.Mutex
 
 		for !l.terminate {
-			EventObject := l.queue.Pull()
-			consistent.Lock()
-
-			go func() {
-				prelock.Lock()
-
-				consistent.Unlock()
-
-				l.Receiver.Receive(EventObject)
-
-				prelock.Unlock()
-			}()
+			op := l.queue.Pull()
+			l.Receiver.Receive(op)
 		}
-
-		close(l.queue.events)
 	}()
 }
 
-func (l *Loop) PostEvent(Event any) {
-	l.queue.Push(Event)
+func (l *Loop) PostEvent(op Operation) {
+	l.queue.Push(op)
 }
 
-func (l *Loop) PostEvents(Events []any) {
-	for _, Event := range Events {
-		l.PostEvent(Event)
+func (l *Loop) PostEvents(ops []Operation) {
+	for _, op := range ops {
+		l.PostEvent(op)
 	}
 }

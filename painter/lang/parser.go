@@ -8,18 +8,17 @@ import (
 	"strconv"
 
 	"bufio"
-	"github.com/magicvegetable/architecture-lab-3/event"
+	"github.com/magicvegetable/architecture-lab-3/painter"
 	"strings"
 )
 
-// Parser уміє прочитати дані з вхідного io.Reader та повернути список операцій представлені вхідним скриптом.
 type Parser struct {
-	savedEventsPool []any
+	savedOperationsPool []painter.Operation
 }
 
-var table = event.GetTable()
+var table = painter.GetTable()
 
-func GetEvent(command string) (any, error) {
+func GetOperation(command string) (painter.Operation, error) {
 	args := []string{command}
 	spacex := regexp.MustCompile(`\s`)
 
@@ -29,20 +28,20 @@ func GetEvent(command string) (any, error) {
 
 	fn, ok := table[args[0]]
 	if !ok {
-		return nil, fmt.Errorf("No such a event as", command)
+		return nil, fmt.Errorf("No such a operation as", command)
 	}
 
 	args = args[1:]
 
 	switch fn := fn.(type) {
-	case event.FillCreateFn:
+	case painter.FillCreateFn:
 		return fn(), nil
 
-	case event.CreateTFigureFn:
+	case painter.CreateTFigureFn:
 		if lenArgs := len(args); lenArgs < 2 {
 			return nil, fmt.Errorf(
 				fmt.Sprintf("wrong len(%d)", lenArgs),
-				"of args for event type", reflect.TypeOf(fn),
+				"of args for operation type", reflect.TypeOf(fn),
 				"have to be at least", 2)
 		}
 		var x, y float64
@@ -60,11 +59,11 @@ func GetEvent(command string) (any, error) {
 
 		return fn(x, y), nil
 
-	case event.CreateBRect:
+	case painter.CreateBRect:
 		if lenArgs := len(args); lenArgs < 4 {
 			return nil, fmt.Errorf(
 				fmt.Sprintf("wrong len(%d)", lenArgs),
-				"of args for event type", reflect.TypeOf(fn),
+				"of args for operation type", reflect.TypeOf(fn),
 				"have to be at least", 4)
 		}
 		var x1, y1, x2, y2 float64
@@ -92,11 +91,11 @@ func GetEvent(command string) (any, error) {
 
 		return fn(x1, y1, x2, y2), nil
 
-	case event.CreateMove:
+	case painter.CreateMove:
 		if lenArgs := len(args); lenArgs < 2 {
 			return nil, fmt.Errorf(
 				fmt.Sprintf("wrong len(%d)", lenArgs),
-				"of args for event type", reflect.TypeOf(fn),
+				"of args for operation type", reflect.TypeOf(fn),
 				"have to be at least", 2)
 		}
 		var x, y float64
@@ -114,14 +113,14 @@ func GetEvent(command string) (any, error) {
 
 		return fn(x, y), nil
 
-	case event.UpdatePoint:
+	case painter.UpdatePoint:
 		if len(args) != 0 {
 			println("consider further parsing...")
 		}
 
 		return fn, nil
 
-	case event.Reset:
+	case painter.Reset:
 		if len(args) != 0 {
 			println("consider further parsing...")
 		}
@@ -129,49 +128,49 @@ func GetEvent(command string) (any, error) {
 		return fn, nil
 	}
 
-	return nil, fmt.Errorf("No such type of event as", reflect.TypeOf(fn))
+	return nil, fmt.Errorf("No such type of operation as", reflect.TypeOf(fn))
 }
 
-func (p *Parser) ParseEvents(in io.Reader) ([]any, error) {
+func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
 	scanner := bufio.NewScanner(in)
 	scanner.Split(bufio.ScanLines)
 
-	parsedEvents := []any{}
+	parsedOps := []painter.Operation{}
 
 	updateToIndex := -1
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		Events := strings.Split(line, "&")
+		ops := strings.Split(line, "&")
 
-		for _, EventCommand := range Events {
-			EventObject, err := GetEvent(EventCommand)
+		for _, op := range ops {
+			op, err := GetOperation(op)
 
 			if err != nil {
 				return nil, err
 			}
 
-			if EventObject == table["update"] {
-				updateToIndex = len(parsedEvents)
+			if op == table["update"] {
+				updateToIndex = len(parsedOps)
 				continue
 			}
 
-			parsedEvents = append(parsedEvents, EventObject)
+			parsedOps = append(parsedOps, op)
 		}
 	}
 
 	if updateToIndex == -1 {
-		p.savedEventsPool = append(p.savedEventsPool, parsedEvents...)
-		return []any{}, nil
+		p.savedOperationsPool = append(p.savedOperationsPool, parsedOps...)
+		return []painter.Operation{}, nil
 	}
 
-	var eventsToApply []any
+	var opsToApply []painter.Operation
 
-	eventsToApply = append(eventsToApply, p.savedEventsPool...)
-	eventsToApply = append(eventsToApply, parsedEvents[:updateToIndex]...)
+	opsToApply = append(opsToApply, p.savedOperationsPool...)
+	opsToApply = append(opsToApply, parsedOps[:updateToIndex]...)
 
-	p.savedEventsPool = []any{}
-	p.savedEventsPool = append(p.savedEventsPool, parsedEvents[updateToIndex:]...)
+	p.savedOperationsPool = []painter.Operation{}
+	p.savedOperationsPool = append(p.savedOperationsPool, parsedOps[updateToIndex:]...)
 
-	return eventsToApply, nil
+	return opsToApply, nil
 }

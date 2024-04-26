@@ -7,10 +7,8 @@ import (
 	"reflect"
 	"sync"
 
-	"fmt"
-	"github.com/magicvegetable/architecture-lab-3/event"
+	"github.com/magicvegetable/architecture-lab-3/painter"
 	"golang.org/x/exp/shiny/driver"
-	// "golang.org/x/exp/shiny/imageutil"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/draw"
 	"golang.org/x/mobile/event/key"
@@ -20,12 +18,19 @@ import (
 	"golang.org/x/mobile/event/size"
 )
 
+type MouseHandler struct {
+	pressed bool
+	handle  bool
+	tf      *painter.TFigure
+	start   image.Point
+}
+
 type DrawableElement interface {
 	Draw(t screen.Texture)
 }
 
 type MoveTFigures interface {
-	MoveTFigures(tfs []event.TFigure, t screen.Texture)
+	MoveTFigures(tfs []painter.TFigure, t screen.Texture)
 }
 
 type ElementsToDraw struct {
@@ -61,26 +66,40 @@ type Visualizer struct {
 	sz  size.Event
 	pos image.Rectangle
 
-	events         chan any
-	moves          []MoveTFigures
+	operations chan painter.Operation
+
+	moves []MoveTFigures
+
 	elementsToDraw ElementsToDraw
 	scr            screen.Screen
 	handledM       sync.Mutex
+
+	mouseHandler MouseHandler
+
+	logger Logger
 }
 
-var evi = int(0)
+type Logger struct {
+	index uint64
+}
 
-func (pw *Visualizer) Receive(Event any) {
-	fmt.Println("Events index", evi)
-	fmt.Println("New Event:", Event)
-	evi += 1
+func (lg *Logger) Log(operation painter.Operation) {
+	log.Println("Operations index", lg.index)
+	log.Println("New Operation:", operation)
+	log.Printf("Operation type %T\n", operation)
+
+	lg.index += 1
+}
+
+func (pw *Visualizer) Receive(operation painter.Operation) {
+	pw.logger.Log(operation)
 
 	pw.handledM.Lock()
-	pw.events <- Event
+	pw.operations <- operation
 }
 
 func (pw *Visualizer) Main() {
-	pw.events = make(chan any)
+	pw.operations = make(chan painter.Operation)
 	pw.done = make(chan struct{})
 	pw.pos.Max.X = 200
 	pw.pos.Max.Y = 200
@@ -90,8 +109,8 @@ func (pw *Visualizer) Main() {
 }
 
 func (pw *Visualizer) AddDefaultElementsToDraw() {
-	fill := event.Fill{color.RGBA{151, 208, 119, 255}}
-	TFigure := event.NewTFigure(0.5, 0.5) // []float64{0.5, 0.5} -> center
+	fill := painter.Fill{color.RGBA{151, 208, 119, 255}}
+	TFigure := painter.NewTFigure(0.5, 0.5) // []float64{0.5, 0.5} -> center
 	pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &fill)
 	pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &TFigure)
 }
@@ -143,12 +162,12 @@ func (pw *Visualizer) run(s screen.Screen) {
 			}
 			pw.handleEvent(e, t)
 
-		case e, ok := <-pw.events:
+		case op, ok := <-pw.operations:
 
 			if !ok {
 				return
 			}
-			pw.handleCommandEvent(e)
+			pw.handlePainterOperation(op)
 			pw.handledM.Unlock()
 		}
 	}
@@ -168,9 +187,9 @@ func detectTerminate(e any) bool {
 	return false
 }
 
-func ConvertToTFigure(el any) (*event.TFigure, bool) {
+func ConvertToTFigure(el painter.Operation) (*painter.TFigure, bool) {
 	switch el := el.(type) {
-	case *event.TFigure:
+	case *painter.TFigure:
 		return el, true
 	default:
 		log.Printf("Cannot convert to tfigure element type of %T...", reflect.TypeOf(el))
@@ -179,7 +198,7 @@ func ConvertToTFigure(el any) (*event.TFigure, bool) {
 	return nil, false
 }
 
-func (pw *Visualizer) GetTopMouseFigureUnderPoint(p image.Point) (*event.TFigure, bool) {
+func (pw *Visualizer) GetTopMouseFigureUnderPoint(p image.Point) (*painter.TFigure, bool) {
 	defer pw.elementsToDraw.tfiguresM.Unlock()
 	pw.elementsToDraw.tfiguresM.Lock()
 
@@ -200,34 +219,23 @@ func (pw *Visualizer) GetTopMouseFigureUnderPoint(p image.Point) (*event.TFigure
 	return nil, false
 }
 
-type mouseEventDataType struct {
-	handle bool
-	tf     *event.TFigure
-	start  image.Point
-}
-
-var mouseEventData = mouseEventDataType{
-	handle: false,
-	tf:     nil,
-}
-
 func (pw *Visualizer) resetMouseEvent() {
-	mouseEventData.handle = false
-	mouseEventData.tf = nil
-	mouseEventData.start = image.Point{}
+	pw.mouseHandler.handle = false
+	pw.mouseHandler.tf = nil
+	pw.mouseHandler.start = image.Point{}
 }
 
 func (pw *Visualizer) setupMouseEvent(sp image.Point) {
 	tf, ok := pw.GetTopMouseFigureUnderPoint(sp) // sp -> start point
 
 	if !ok {
-		mouseEventData.handle = false
+		pw.mouseHandler.handle = false
 		return
 	}
 
-	mouseEventData.handle = true
-	mouseEventData.tf = tf
-	mouseEventData.start = sp
+	pw.mouseHandler.handle = true
+	pw.mouseHandler.tf = tf
+	pw.mouseHandler.start = sp
 }
 
 func (pw *Visualizer) grabbedTFigureIsPresent() bool {
@@ -243,7 +251,7 @@ func (pw *Visualizer) grabbedTFigureIsPresent() bool {
 			continue
 		}
 
-		if tf == mouseEventData.tf {
+		if tf == pw.mouseHandler.tf {
 			return true
 		}
 	}
@@ -252,53 +260,52 @@ func (pw *Visualizer) grabbedTFigureIsPresent() bool {
 }
 
 func (pw *Visualizer) handleMouseEvent(dest image.Point) {
-	if !mouseEventData.handle {
+	if !pw.mouseHandler.handle {
 		return
 	}
 
 	if !pw.grabbedTFigureIsPresent() {
-		// TODO: reset mouse event
+		pw.resetMouseEvent()
 		return
 	}
 
-	mouseEventData.tf.Move(image.Point{
-		dest.X - mouseEventData.start.X,
-		dest.Y - mouseEventData.start.Y,
+	pw.mouseHandler.tf.Move(image.Point{
+		dest.X - pw.mouseHandler.start.X,
+		dest.Y - pw.mouseHandler.start.Y,
 	})
 
-	mouseEventData.start.X = dest.X
-	mouseEventData.start.Y = dest.Y
+	pw.mouseHandler.start.X = dest.X
+	pw.mouseHandler.start.Y = dest.Y
 
 	pw.w.Send(paint.Event{})
 }
 
-func (pw *Visualizer) handleCommandEvent(e any) {
+func (pw *Visualizer) handlePainterOperation(op painter.Operation) {
 	defer pw.elementsToDraw.Unlock()
 	pw.elementsToDraw.Lock()
 
-	switch e := e.(type) {
-	case event.Fill:
-		pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &e)
-	case event.TFigure:
-		pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &e)
-	case event.BRect:
-		pw.elementsToDraw.brects = append(pw.elementsToDraw.brects, &e)
-	case event.Move:
-		pw.moves = append(pw.moves, &e)
-	case event.Reset:
+	switch op := op.(type) {
+	case painter.Fill:
+		pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &op)
+	case painter.TFigure:
+		pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &op)
+	case painter.BRect:
+		pw.elementsToDraw.brects = append(pw.elementsToDraw.brects, &op)
+	case painter.Move:
+		pw.moves = append(pw.moves, &op)
+	case painter.Reset:
 		pw.elementsToDraw.backgrounds = pw.elementsToDraw.backgrounds[:0]
 		pw.elementsToDraw.tfigures = pw.elementsToDraw.tfigures[:0]
 		pw.elementsToDraw.brects = pw.elementsToDraw.brects[:0]
 	}
+
 	pw.w.Send(paint.Event{})
 }
-
-var pressed = bool(false)
 
 func (pw *Visualizer) handleEvent(e any, t screen.Texture) {
 	switch e := e.(type) {
 
-	case size.Event: // Оновлення даних про розмір вікна.
+	case size.Event:
 		pw.sz = e
 
 	case error:
@@ -308,20 +315,18 @@ func (pw *Visualizer) handleEvent(e any, t screen.Texture) {
 		if t == nil {
 			if e.Button == mouse.ButtonLeft {
 				dest := image.Point{int(e.X), int(e.Y)}
-				pressed = !pressed
-				log.Printf("got button event...")
-				if pressed {
+				pw.mouseHandler.pressed = !pw.mouseHandler.pressed
+				if pw.mouseHandler.pressed {
 					pw.setupMouseEvent(dest)
 				} else {
 					pw.resetMouseEvent()
 				}
 			}
 
-			if pressed {
+			if pw.mouseHandler.pressed {
 				dest := image.Point{int(e.X), int(e.Y)}
 				pw.handleMouseEvent(dest)
 			}
-			// TODO: Реалізувати реакцію на натискання кнопки миші.
 		}
 
 	case paint.Event:
@@ -332,14 +337,18 @@ func (pw *Visualizer) handleEvent(e any, t screen.Texture) {
 }
 
 func (pw *Visualizer) handleMoves(texture screen.Texture) {
+	defer pw.elementsToDraw.tfiguresM.Unlock()
+
+	pw.elementsToDraw.tfiguresM.Lock()
+
 	if len(pw.moves) == 0 {
 		return
 	}
 
-	tfs := make([]event.TFigure, len(pw.elementsToDraw.tfigures))
+	tfs := make([]painter.TFigure, len(pw.elementsToDraw.tfigures))
 
 	for i, tfel := range pw.elementsToDraw.tfigures {
-		tfs[i] = *tfel.(*event.TFigure)
+		tfs[i] = *tfel.(*painter.TFigure)
 	}
 
 	for _, mv := range pw.moves {
