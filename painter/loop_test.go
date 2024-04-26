@@ -6,101 +6,120 @@ import (
 	"image/draw"
 	"reflect"
 	"testing"
+	"os"
+	"log"
+	"sync"
+	"math/rand/v2"
+	"math"
+	"fmt"
 
 	"golang.org/x/exp/shiny/screen"
 )
+func LogOpsToOps(lgs []*LogOperation) (ops []Operation) {
+	for _, lg := range lgs {
+		ops = append(ops, lg)
+	}
+	return
+}
 
+var strLenLim = 100
+var maxChar = int(math.Pow(2, float64(reflect.TypeOf("x"[0]).Size()) * 8.0) - 1)
+
+func RandomLogOps(lim int) (ops []*LogOperation) {
+	amount := 1 + int(float64(lim - 1) * rand.Float64())
+
+	for i := 0; i < amount; i++ {
+		strLen := rand.Int() % strLenLim
+
+		str := ""
+
+		for j := 0; j < strLen; j++ {
+			str += fmt.Sprintf("%c", rand.Int() % maxChar)
+		}
+
+		ops = append(ops, &LogOperation{Data: str})
+	}
+
+	return
+}
 func TestLoop_Post(t *testing.T) {
 	var (
 		l  Loop
 		tr testReceiver
 	)
+	gen := &mockGenerator{}
+	l.Gen = gen
 	l.Receiver = &tr
+	tr.StopLoop = l.Terminate
+	tr.GetTexture = l.Gen.Generate
+	tr.Size = image.Pt(800, 800)
+	scr := mockScreen{}
+	checker := Checker{Scr: scr}
+	tr.checker = &checker
 
-	var testOps []string
-
-	l.Start(mockScreen{})
-	l.Post(logOp(t, "do white fill", WhiteFill))
-	l.Post(logOp(t, "do green fill", GreenFill))
-	l.Post(UpdateOp)
-
-	for i := 0; i < 3; i++ {
-		go l.Post(logOp(t, "do green fill", GreenFill))
+		type Case struct {
+			name string
+			ops []*LogOperation
+		}
+		cases := []Case{
+			{
+				name: "one",
+				ops: []*LogOperation{
+					{Data: "Throughout Heaven and Earth, I Alone Am The Honored One"},
+				},
+			},
+			{
+				name: "two",
+				ops: []*LogOperation{
+					{Data: "Stand Proud, You are Strong"},
+					{Data: "You Can See It, Mahoraga! You Can See My Cursed Technique"},
+				},
+			},
+			{
+			name: "three",
+			ops: []*LogOperation{{Data: "If Sukuna Regained All His Power, It Might Cause Me a Little Trouble"},
+			{Data: "But Would You Lose?"},
+			{Data: "I'd Win"},
+		},
+	},
+}
+l.Start(mockScreen{})
+	for _, c := range cases {
+		verified := make(chan struct{})
+		checker.OpsPack = c.ops
+		checker.verified = verified
+		t.Run(c.name, func(t *testing.T) {
+			checker.t = t
+			l.PostOperations(LogOpsToOps(c.ops))
+			<- verified
+		})
+		if t.Failed() {
+			break
+		}
+		gen.Reset()
 	}
 
-	l.Post(OperationFunc(func(screen.Texture) {
-		testOps = append(testOps, "op 1")
-		l.Post(OperationFunc(func(screen.Texture) {
-			testOps = append(testOps, "op 2")
-		}))
-	}))
-	l.Post(OperationFunc(func(screen.Texture) {
-		testOps = append(testOps, "op 3")
-	}))
+	for i := 0; i < 100; i++ {
+		verified := make(chan struct{})
 
-	l.StopAndWait()
+		ops := RandomLogOps(i)
+		checker.OpsPack = ops
+		checker.verified = verified
 
-	if tr.lastTexture == nil {
-		t.Fatal("Texture was not updated")
-	}
-	mt, ok := tr.lastTexture.(*mockTexture)
-	if !ok {
-		t.Fatal("Unexpected texture", tr.lastTexture)
-	}
-	if mt.Colors[0] != color.White {
-		t.Error("First color is not white:", mt.Colors)
-	}
-	if len(mt.Colors) != 2 {
-		t.Error("Unexpected size of colors:", mt.Colors)
+		t.Run(fmt.Sprintf("random test %d", i), func(t *testing.T) {
+			checker.t = t
+
+			l.PostOperations(LogOpsToOps(ops))
+
+			<- verified
+		})
+
+		if t.Failed() {
+			break
+		}
+
+		gen.Reset()
 	}
 
-	if !reflect.DeepEqual(testOps, []string{"op 1", "op 2", "op 3"}) {
-		t.Error("Bad order:", testOps)
-	}
-}
-
-func logOp(t *testing.T, msg string, op OperationFunc) OperationFunc {
-	return func(tx screen.Texture) {
-		t.Log(msg)
-		op(tx)
-	}
-}
-
-type testReceiver struct {
-	lastTexture screen.Texture
-}
-
-func (tr *testReceiver) Update(t screen.Texture) {
-	tr.lastTexture = t
-}
-
-type mockScreen struct{}
-
-func (m mockScreen) NewBuffer(size image.Point) (screen.Buffer, error) {
-	panic("implement me")
-}
-
-func (m mockScreen) NewTexture(size image.Point) (screen.Texture, error) {
-	return new(mockTexture), nil
-}
-
-func (m mockScreen) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	panic("implement me")
-}
-
-type mockTexture struct {
-	Colors []color.Color
-}
-
-func (m *mockTexture) Release() {}
-
-func (m *mockTexture) Size() image.Point { return size }
-
-func (m *mockTexture) Bounds() image.Rectangle {
-	return image.Rectangle{Max: m.Size()}
-}
-
-func (m *mockTexture) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {}
-func (m *mockTexture) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	m.Colors = append(m.Colors, src)
+	l.Terminate()
 }
