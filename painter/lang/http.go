@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/roman-mazur/architecture-lab-3/painter"
+	"github.com/magicvegetable/architecture-lab-3/painter"
 	// "bufio"
 )
 
@@ -28,7 +28,7 @@ func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
 		}
 		if len(events) != 0 {
 			go func() {
-			loop.PostEvents(events)
+				loop.PostEvents(events)
 			}()
 		}
 

@@ -4,9 +4,12 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"reflect"
 
+	"fmt"
+	"github.com/magicvegetable/architecture-lab-3/event"
 	"golang.org/x/exp/shiny/driver"
-	"golang.org/x/exp/shiny/imageutil"
+	// "golang.org/x/exp/shiny/imageutil"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/draw"
 	"golang.org/x/mobile/event/key"
@@ -14,38 +17,20 @@ import (
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
-	// "fmt"
 )
 
-var FigureColor = color.RGBA{R: 255, G: 102, B: 102, A: 255}
-
-type Figure struct {
-	frame image.Rectangle
-	color color.RGBA
+type DrawableElement interface {
+	Draw(t screen.Texture)
 }
+
 type MoveTFigures interface {
 	MoveTFigures(tfs []event.TFigure, t screen.Texture)
 }
 
 type ElementsToDraw struct {
-	tfigures []DrawableElement
+	tfigures    []DrawableElement
 	backgrounds []DrawableElement
-	brects []DrawableElement
-}
-
-
-func (fg *Figure) draw(w screen.Window) {
-	horizontal := fg.frame
-	horizontal.Max.Y = (horizontal.Max.Y + horizontal.Min.Y) >> 1
-
-	vertical := fg.frame
-	half := (vertical.Max.X - vertical.Min.X) >> 2
-	center := (vertical.Max.X + vertical.Min.X) >> 1
-	vertical.Max.X = center + half
-	vertical.Min.X = center - half
-
-	w.Fill(horizontal, fg.color, draw.Src)
-	w.Fill(vertical, fg.color, draw.Src)
+	brects      []DrawableElement
 }
 
 type Visualizer struct {
@@ -54,33 +39,41 @@ type Visualizer struct {
 	OnScreenReady func(s screen.Screen)
 
 	w    screen.Window
-	tx   chan screen.Texture
 	done chan struct{}
 
-	sz      size.Event
-	pos     image.Rectangle
-	figures []Figure
+	sz  size.Event
+	pos image.Rectangle
+
+	events         chan any
+	moves          []MoveTFigures
+	elementsToDraw ElementsToDraw
+	scr            screen.Screen
+}
+
+var evi = int(0)
+
+func (pw *Visualizer) Receive(Event any) {
+	fmt.Println("Events index", evi)
+	fmt.Println("New Event:", Event)
+	evi += 1
+	pw.events <- Event
 }
 
 func (pw *Visualizer) Main() {
-	pw.tx = make(chan screen.Texture)
+	pw.events = make(chan any)
 	pw.done = make(chan struct{})
 	pw.pos.Max.X = 200
 	pw.pos.Max.Y = 200
 
-	pw.figures = append(pw.figures, Figure{
-		frame: image.Rectangle{
-			Min: image.Point{X: 200, Y: 200},
-			Max: image.Point{X: 600, Y: 600},
-		},
-		color: FigureColor,
-	})
-
+	pw.AddDefaultElementsToDraw()
 	driver.Main(pw.run)
 }
 
-func (pw *Visualizer) Update(t screen.Texture) {
-	pw.tx <- t
+func (pw *Visualizer) AddDefaultElementsToDraw() {
+	fill := event.Fill{color.RGBA{151, 208, 119, 255}}
+	TFigure := event.NewTFigure(0.5, 0.5) // []float64{0.5, 0.5} -> center
+	pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &fill)
+	pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &TFigure)
 }
 
 func (pw *Visualizer) run(s screen.Screen) {
@@ -98,6 +91,7 @@ func (pw *Visualizer) run(s screen.Screen) {
 		close(pw.done)
 	}()
 
+	pw.scr = s
 	if pw.OnScreenReady != nil {
 		pw.OnScreenReady(s)
 	}
@@ -129,8 +123,11 @@ func (pw *Visualizer) run(s screen.Screen) {
 			}
 			pw.handleEvent(e, t)
 
-		case t = <-pw.tx:
-			w.Send(paint.Event{})
+		case e, ok := <-pw.events:
+			if !ok {
+				return
+			}
+			pw.handleCommandEvent(e)
 		}
 	}
 }
@@ -149,62 +146,96 @@ func detectTerminate(e any) bool {
 	return false
 }
 
-func (pw *Visualizer) frameOfFigures() image.Rectangle {
-	frame := pw.figures[0].frame
+func ConvertToTFigure(el any) (*event.TFigure, bool) {
+	switch el := el.(type) {
+	case *event.TFigure:
+		return el, true
+	default:
+		log.Printf("Cannot convert to tfigure element type of %T...", reflect.TypeOf(el))
+	}
 
-	for _, fg := range pw.figures {
-		subframe := fg.frame
+	return nil, false
+}
 
-		if subframe.Min.X < frame.Min.X {
-			frame.Min.X = subframe.Min.X
+func (pw *Visualizer) GetTopMouseFigureUnderPoint(p image.Point) (*event.TFigure, bool) {
+	for i := len(pw.elementsToDraw.tfigures) - 1; i >= 0; i-- {
+		el := pw.elementsToDraw.tfigures[i]
+
+		tf, ok := ConvertToTFigure(el)
+
+		if !ok {
+			continue
 		}
 
-		if subframe.Min.Y < frame.Min.Y {
-			frame.Min.Y = subframe.Min.Y
-		}
-
-		if subframe.Max.Y > frame.Max.Y {
-			frame.Max.Y = subframe.Max.Y
-		}
-
-		if subframe.Max.X > frame.Max.X {
-			frame.Max.X = subframe.Max.X
+		if tf.Contains(p) {
+			return tf, true
 		}
 	}
 
-	return frame
+	return nil, false
+}
+
+type mouseEventDataType struct {
+	handle bool
+	tf     *event.TFigure
+	start  image.Point
+}
+
+var mouseEventData = mouseEventDataType{
+	handle: false,
+	tf:     nil,
+}
+
+func (pw *Visualizer) resetMouseEvent() {
+	mouseEventData.handle = false
+	mouseEventData.tf = nil
+	mouseEventData.start = image.Point{}
+}
+
+func (pw *Visualizer) setupMouseEvent(sp image.Point) {
+	tf, ok := pw.GetTopMouseFigureUnderPoint(sp) // sp -> start point
+
+	if !ok {
+		mouseEventData.handle = false
+		return
+	}
+
+	mouseEventData.handle = true
+	mouseEventData.tf = tf
+	mouseEventData.start = sp
 }
 
 func (pw *Visualizer) handleMouseEvent(dest image.Point) {
-	if len(pw.figures) == 0 {
+	if !mouseEventData.handle {
 		return
 	}
 
-	frame := pw.frameOfFigures()
-	center := image.Point{
-		X: (frame.Min.X + frame.Max.X) >> 1,
-		Y: (frame.Min.Y + frame.Max.Y) >> 1,
+	mouseEventData.tf.Move(image.Point{
+		dest.X - mouseEventData.start.X,
+		dest.Y - mouseEventData.start.Y,
+	})
+
+	mouseEventData.start.X = dest.X
+	mouseEventData.start.Y = dest.Y
+
+	pw.w.Send(paint.Event{})
+}
+
+func (pw *Visualizer) handleCommandEvent(e any) {
+	switch e := e.(type) {
+	case event.Fill:
+		pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &e)
+	case event.TFigure:
+		pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &e)
+	case event.BRect:
+		pw.elementsToDraw.brects = append(pw.elementsToDraw.brects, &e)
+	case event.Move:
+		pw.moves = append(pw.moves, &e)
+	case event.Reset:
+		pw.elementsToDraw.backgrounds = pw.elementsToDraw.backgrounds[:0]
+		pw.elementsToDraw.tfigures = pw.elementsToDraw.brects[:0]
+		pw.elementsToDraw.brects = pw.elementsToDraw.brects[:0]
 	}
-
-	tvector := image.Point{
-		X: dest.X - center.X,
-		Y: dest.Y - center.Y,
-	}
-
-	if tvector.X == 0 && tvector.Y == 0 {
-		return
-	}
-
-	for i, fg := range pw.figures {
-		frame := fg.frame
-		frame.Min.X += tvector.X
-		frame.Min.Y += tvector.Y
-		frame.Max.X += tvector.X
-		frame.Max.Y += tvector.Y
-
-		pw.figures[i].frame = frame
-	}
-
 	pw.w.Send(paint.Event{})
 }
 
@@ -222,41 +253,71 @@ func (pw *Visualizer) handleEvent(e any, t screen.Texture) {
 	case mouse.Event:
 		if t == nil {
 			if e.Button == mouse.ButtonLeft {
-				dest := image.Point{X: int(e.X), Y: int(e.Y)}
+				dest := image.Point{int(e.X), int(e.Y)}
 				pressed = !pressed
-				pw.handleMouseEvent(dest)
+				log.Printf("got button event...")
+				if pressed {
+					pw.setupMouseEvent(dest)
+				} else {
+					pw.resetMouseEvent()
+				}
 			}
 
 			if pressed {
-				dest := image.Point{X: int(e.X), Y: int(e.Y)}
+				dest := image.Point{int(e.X), int(e.Y)}
 				pw.handleMouseEvent(dest)
 			}
 			// TODO: Реалізувати реакцію на натискання кнопки миші.
 		}
 
 	case paint.Event:
-		// Малювання контенту вікна.
-		if t == nil {
-			pw.drawDefaultUI()
-		} else {
-			// Використання текстури отриманої через виклик Update.
-			pw.w.Scale(pw.sz.Bounds(), t, t.Bounds(), draw.Src, nil)
-		}
+		pw.drawElements()
+
 		pw.w.Publish()
 	}
 }
 
-func (pw *Visualizer) drawDefaultUI() {
-	pw.w.Fill(pw.sz.Bounds(), color.RGBA{R: 151, G: 208, B: 119, A: 255}, draw.Src) // Фон.
-
-	for _, fg := range pw.figures {
-		fg.draw(pw.w)
+func (pw *Visualizer) handleMoves(texture screen.Texture) {
+	if len(pw.moves) == 0 {
+		return
 	}
 
-	// TODO: Змінити колір фону та додати відображення фігури у вашому варіанті.
+	var tfs []event.TFigure
 
-	// Малювання білої рамки.
-	for _, br := range imageutil.Border(pw.sz.Bounds(), 10) {
-		pw.w.Fill(br, color.White, draw.Src)
+	for _, tfel := range pw.elementsToDraw.tfigures {
+		tf, _ := ConvertToTFigure(tfel)
+		tfs = append(tfs, *tf)
 	}
+
+	for _, mv := range pw.moves {
+		mv.MoveTFigures(tfs, texture)
+	}
+
+	pw.moves = []MoveTFigures{}
+}
+
+func (pw *Visualizer) drawElements() {
+	texture, err := pw.scr.NewTexture(pw.sz.Size())
+	if err != nil {
+		println(err)
+		return
+	}
+
+	pw.handleMoves(texture)
+
+	for _, element := range pw.elementsToDraw.backgrounds {
+		element.Draw(texture)
+	}
+
+	for _, element := range pw.elementsToDraw.brects {
+		element.Draw(texture)
+	}
+
+	for _, element := range pw.elementsToDraw.tfigures {
+		element.Draw(texture)
+	}
+
+	pw.w.Scale(pw.sz.Bounds(), texture, texture.Bounds(), draw.Src, nil)
+
+	texture.Release()
 }
