@@ -38,7 +38,7 @@ func (f *Fill) Draw(t screen.Texture) {
 }
 
 func NewGreenFill() Fill {
-	return Fill{color.RGBA{G: 0xff, A: 0xff}}
+	return Fill{color.RGBA{151, 208, 119, 255}}
 }
 
 func NewWhiteFill() Fill {
@@ -122,7 +122,7 @@ func NewTFigure(x, y float64) TFigure {
 		Color:               TFigureColor,
 		Center:              center,
 		originalTextureRect: nil,
-		Size:                Point{0.5, 0.5}, // default size
+		Size:                Point{0.25, 0.25}, // default size
 	}
 }
 

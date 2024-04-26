@@ -2,7 +2,6 @@ package ui
 
 import (
 	"image"
-	"image/color"
 	"log"
 	"reflect"
 	"sync"
@@ -31,6 +30,19 @@ type DrawableElement interface {
 
 type MoveTFigures interface {
 	MoveTFigures(tfs []painter.TFigure, t screen.Texture)
+}
+
+type MoveHandler struct {
+	moves []MoveTFigures
+	m     sync.Mutex
+}
+
+func (mvh *MoveHandler) Lock() {
+	mvh.m.Lock()
+}
+
+func (mvh *MoveHandler) Unlock() {
+	mvh.m.Unlock()
 }
 
 type ElementsToDraw struct {
@@ -68,7 +80,7 @@ type Visualizer struct {
 
 	operations chan painter.Operation
 
-	moves []MoveTFigures
+	mvHandler MoveHandler
 
 	elementsToDraw ElementsToDraw
 	scr            screen.Screen
@@ -109,7 +121,7 @@ func (pw *Visualizer) Main() {
 }
 
 func (pw *Visualizer) AddDefaultElementsToDraw() {
-	fill := painter.Fill{color.RGBA{151, 208, 119, 255}}
+	fill := painter.NewGreenFill()
 	TFigure := painter.NewTFigure(0.5, 0.5) // []float64{0.5, 0.5} -> center
 	pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &fill)
 	pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &TFigure)
@@ -282,7 +294,9 @@ func (pw *Visualizer) handleMouseEvent(dest image.Point) {
 
 func (pw *Visualizer) handlePainterOperation(op painter.Operation) {
 	defer pw.elementsToDraw.Unlock()
+	defer pw.mvHandler.Unlock()
 	pw.elementsToDraw.Lock()
+	pw.mvHandler.Lock()
 
 	switch op := op.(type) {
 	case painter.Fill:
@@ -292,7 +306,7 @@ func (pw *Visualizer) handlePainterOperation(op painter.Operation) {
 	case painter.BRect:
 		pw.elementsToDraw.brects = append(pw.elementsToDraw.brects, &op)
 	case painter.Move:
-		pw.moves = append(pw.moves, &op)
+		pw.mvHandler.moves = append(pw.mvHandler.moves, &op)
 	case painter.Reset:
 		pw.elementsToDraw.backgrounds = pw.elementsToDraw.backgrounds[:0]
 		pw.elementsToDraw.tfigures = pw.elementsToDraw.tfigures[:0]
@@ -338,10 +352,12 @@ func (pw *Visualizer) handleEvent(e any, t screen.Texture) {
 
 func (pw *Visualizer) handleMoves(texture screen.Texture) {
 	defer pw.elementsToDraw.tfiguresM.Unlock()
+	defer pw.mvHandler.Unlock()
 
 	pw.elementsToDraw.tfiguresM.Lock()
+	pw.mvHandler.Lock()
 
-	if len(pw.moves) == 0 {
+	if len(pw.mvHandler.moves) == 0 {
 		return
 	}
 
@@ -351,11 +367,11 @@ func (pw *Visualizer) handleMoves(texture screen.Texture) {
 		tfs[i] = *tfel.(*painter.TFigure)
 	}
 
-	for _, mv := range pw.moves {
+	for _, mv := range pw.mvHandler.moves {
 		mv.MoveTFigures(tfs, texture)
 	}
 
-	pw.moves = pw.moves[:0]
+	pw.mvHandler.moves = pw.mvHandler.moves[:0]
 }
 
 func (pw *Visualizer) GetElementsToDraw() (elements []DrawableElement) {

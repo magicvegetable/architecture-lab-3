@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/magicvegetable/architecture-lab-3/painter"
+	"log"
 	"sync"
 )
 
@@ -24,9 +25,9 @@ func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
 		events, err := p.ParseOperations(in)
 
 		if err != nil {
-			// TODO: handle errors
-			println(err)
-			rw.WriteHeader(http.StatusBadRequest)
+			log.Println(err)
+			http.Error(rw, "An error occurred: "+err.Error(), http.StatusBadRequest)
+
 			parserM.Unlock()
 			return
 		}

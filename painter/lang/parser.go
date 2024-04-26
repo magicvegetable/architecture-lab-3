@@ -3,7 +3,6 @@ package lang
 import (
 	"fmt"
 	"io"
-	"reflect"
 	"regexp"
 	"strconv"
 
@@ -19,8 +18,10 @@ type Parser struct {
 var table = painter.GetTable()
 
 func GetOperation(command string) (painter.Operation, error) {
+	command = strings.TrimSpace(command)
+
 	args := []string{command}
-	spacex := regexp.MustCompile(`\s`)
+	spacex := regexp.MustCompile(`\s+`)
 
 	if spacex.MatchString(command) {
 		args = spacex.Split(command, -1)
@@ -28,7 +29,8 @@ func GetOperation(command string) (painter.Operation, error) {
 
 	fn, ok := table[args[0]]
 	if !ok {
-		return nil, fmt.Errorf("No such a operation as", command)
+		errMessage := fmt.Sprintf("Get wrong command `%s`, no such a operation as `%s` in the table", command, args[0])
+		return nil, fmt.Errorf(errMessage)
 	}
 
 	args = args[1:]
@@ -38,11 +40,13 @@ func GetOperation(command string) (painter.Operation, error) {
 		return fn(), nil
 
 	case painter.CreateTFigureFn:
-		if lenArgs := len(args); lenArgs < 2 {
-			return nil, fmt.Errorf(
-				fmt.Sprintf("wrong len(%d)", lenArgs),
-				"of args for operation type", reflect.TypeOf(fn),
-				"have to be at least", 2)
+		if lenArgs := len(args); lenArgs != 2 {
+			errMessage := fmt.Sprintf(
+				"wrong len(%d) of args for operation type %T, amount have to be %d",
+				lenArgs, fn, 2,
+			)
+
+			return nil, fmt.Errorf(errMessage)
 		}
 		var x, y float64
 		var err error
@@ -60,11 +64,13 @@ func GetOperation(command string) (painter.Operation, error) {
 		return fn(x, y), nil
 
 	case painter.CreateBRect:
-		if lenArgs := len(args); lenArgs < 4 {
-			return nil, fmt.Errorf(
-				fmt.Sprintf("wrong len(%d)", lenArgs),
-				"of args for operation type", reflect.TypeOf(fn),
-				"have to be at least", 4)
+		if lenArgs := len(args); lenArgs != 4 {
+			errMessage := fmt.Sprintf(
+				"wrong len(%d) of args for operation type %T, amount have to be %d",
+				lenArgs, fn, 4,
+			)
+
+			return nil, fmt.Errorf(errMessage)
 		}
 		var x1, y1, x2, y2 float64
 		var err error
@@ -92,11 +98,12 @@ func GetOperation(command string) (painter.Operation, error) {
 		return fn(x1, y1, x2, y2), nil
 
 	case painter.CreateMove:
-		if lenArgs := len(args); lenArgs < 2 {
-			return nil, fmt.Errorf(
-				fmt.Sprintf("wrong len(%d)", lenArgs),
-				"of args for operation type", reflect.TypeOf(fn),
-				"have to be at least", 2)
+		if lenArgs := len(args); lenArgs != 2 {
+			errMessage := fmt.Sprintf(
+				"wrong len(%d) of args for operation type %T, amount have to be %d",
+				lenArgs, fn, 2,
+			)
+			return nil, fmt.Errorf(errMessage)
 		}
 		var x, y float64
 		var err error
@@ -115,20 +122,21 @@ func GetOperation(command string) (painter.Operation, error) {
 
 	case painter.UpdatePoint:
 		if len(args) != 0 {
-			println("consider further parsing...")
+			return nil, fmt.Errorf("no support for multiple instruction per line")
 		}
 
 		return fn, nil
 
 	case painter.Reset:
 		if len(args) != 0 {
-			println("consider further parsing...")
+			return nil, fmt.Errorf("no support for multiple instruction per line")
 		}
 
 		return fn, nil
 	}
 
-	return nil, fmt.Errorf("No such type of operation as", reflect.TypeOf(fn))
+	errMessage := fmt.Sprintf("Handler not implemented for such of operation as `%s` yet", fn)
+	return nil, fmt.Errorf(errMessage)
 }
 
 func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
