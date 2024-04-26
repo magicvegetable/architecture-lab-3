@@ -3,10 +3,9 @@ package painter
 import "sync"
 import "golang.org/x/exp/shiny/screen"
 
-
 type queueElement struct {
 	value Operation
-	next *queueElement
+	next  *queueElement
 }
 
 type operationQueue struct {
@@ -51,7 +50,7 @@ func (q *operationQueue) Pull() Operation {
 		q.blocked = make(chan struct{})
 		q.m.Unlock()
 
-		<- q.blocked
+		<-q.blocked
 		q.m.Lock()
 
 		if q.terminate {
@@ -113,7 +112,7 @@ func (l *Loop) Terminate() {
 
 	l.queue.m.Unlock()
 
-	<- l.terminated
+	<-l.terminated
 }
 
 func (l *Loop) PostOperation(op Operation) {
@@ -132,4 +131,3 @@ func (l *Loop) AddDefaultElements() {
 	l.Gen.Update(bck)
 	l.Gen.Update(tf)
 }
-

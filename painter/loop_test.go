@@ -1,17 +1,17 @@
 package painter
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"reflect"
-	"testing"
-	"os"
 	"log"
-	"sync"
-	"math/rand/v2"
 	"math"
-	"fmt"
+	"math/rand/v2"
+	"os"
+	"reflect"
+	"sync"
+	"testing"
 
 	"golang.org/x/exp/shiny/screen"
 )
@@ -25,10 +25,10 @@ func LogOpsToOps(lgs []*LogOperation) (ops []Operation) {
 }
 
 var strLenLim = 100
-var maxChar = int(math.Pow(2, float64(reflect.TypeOf("x"[0]).Size()) * 8.0) - 1)
+var maxChar = int(math.Pow(2, float64(reflect.TypeOf("x"[0]).Size())*8.0) - 1)
 
 func RandomLogOps(lim int) (ops []*LogOperation) {
-	amount := 1 + int(float64(lim - 1) * rand.Float64())
+	amount := 1 + int(float64(lim-1)*rand.Float64())
 
 	for i := 0; i < amount; i++ {
 		strLen := rand.Int() % strLenLim
@@ -36,7 +36,7 @@ func RandomLogOps(lim int) (ops []*LogOperation) {
 		str := ""
 
 		for j := 0; j < strLen; j++ {
-			str += fmt.Sprintf("%c", rand.Int() % maxChar)
+			str += fmt.Sprintf("%c", rand.Int()%maxChar)
 		}
 
 		ops = append(ops, &LogOperation{Data: str})
@@ -66,7 +66,7 @@ func TestLoop_Post(t *testing.T) {
 
 	type Case struct {
 		name string
-		ops []*LogOperation
+		ops  []*LogOperation
 	}
 
 	cases := []Case{
@@ -106,7 +106,7 @@ func TestLoop_Post(t *testing.T) {
 
 			l.PostOperations(LogOpsToOps(c.ops))
 
-			<- verified
+			<-verified
 		})
 
 		if t.Failed() {
@@ -128,7 +128,7 @@ func TestLoop_Post(t *testing.T) {
 
 			l.PostOperations(LogOpsToOps(ops))
 
-			<- verified
+			<-verified
 		})
 
 		if t.Failed() {
@@ -152,8 +152,8 @@ func (lg *LogOperation) Log(t *mockTexture) {
 type Checker struct {
 	OpsPack []*LogOperation
 
-	Scr mockScreen
-	t *testing.T
+	Scr      mockScreen
+	t        *testing.T
 	verified chan struct{}
 }
 
@@ -176,7 +176,7 @@ func (ch *Checker) Check(t1 screen.Texture) {
 
 	for i := 0; i < len(mt1.Logs); i++ {
 		lg := ch.OpsPack[i]
-		
+
 		lg.Log(mt2)
 	}
 
@@ -187,18 +187,17 @@ func (ch *Checker) Check(t1 screen.Texture) {
 		go ch.t.FailNow()
 		return
 	}
-	
+
 	if len(mt1.Logs) == len(ch.OpsPack) {
 		close(ch.verified)
 	}
 }
 
-
 type testReceiver struct {
 	lastTexture screen.Texture
-	Size image.Point
-	GetTexture func(p image.Point) (screen.Texture, error)
-	StopLoop func()
+	Size        image.Point
+	GetTexture  func(p image.Point) (screen.Texture, error)
+	StopLoop    func()
 
 	checker *Checker
 }
@@ -218,11 +217,10 @@ func (tr *testReceiver) Update() {
 	t.Release()
 }
 
-
-type mockGenerator struct{
+type mockGenerator struct {
 	Scr screen.Screen
 
-	LogOps []*LogOperation
+	LogOps  []*LogOperation
 	LogOpsM sync.Mutex
 }
 
@@ -309,4 +307,3 @@ func (m *mockTexture) Bounds() image.Rectangle { return image.Rectangle{Max: m.S
 func (m *mockTexture) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {}
 
 func (m *mockTexture) Fill(dr image.Rectangle, src color.Color, op draw.Op) {}
-

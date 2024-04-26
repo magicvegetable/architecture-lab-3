@@ -19,11 +19,11 @@ type Visualizer struct {
 	Debug bool
 
 	OnScreenReady func(s screen.Screen)
-	StopLoop func()
-	GetTexture func(p image.Point) (screen.Texture, error)
-	HandleClick func(e mouse.Event) bool
+	StopLoop      func()
+	GetTexture    func(p image.Point) (screen.Texture, error)
+	HandleClick   func(e mouse.Event) bool
 
-	w screen.Window
+	w    screen.Window
 	done chan struct{}
 
 	sz size.Event
@@ -37,11 +37,10 @@ func (pw *Visualizer) Main() {
 
 func (pw *Visualizer) run(s screen.Screen) {
 	w, err := s.NewWindow(&screen.NewWindowOptions{
-		Title: pw.Title,
-		Width: 800,
+		Title:  pw.Title,
+		Width:  800,
 		Height: 800,
 	})
-
 
 	if err != nil {
 		log.Fatal("Failed to initialize the app window:", err)
@@ -134,4 +133,3 @@ func (pw *Visualizer) handleEvent(e any) {
 func (pw *Visualizer) Update() {
 	pw.w.Send(paint.Event{})
 }
-

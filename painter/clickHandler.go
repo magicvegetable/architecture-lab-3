@@ -5,8 +5,8 @@ import "golang.org/x/mobile/event/mouse"
 
 type ClickHandler struct {
 	pressed bool
-	tf *TFigure
-	start image.Point
+	tf      *TFigure
+	start   image.Point
 
 	GetTFigures func() []*TFigure
 }
@@ -93,4 +93,3 @@ func (cl *ClickHandler) handle(dest image.Point) {
 	cl.start.X = dest.X
 	cl.start.Y = dest.Y
 }
-

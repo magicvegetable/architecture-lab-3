@@ -12,7 +12,7 @@ type checkFn func(args []float64)
 func iterate(nestedIndex uint, args []float64, fn checkFn) {
 	for i := 0.0; i < 1.0; i += 0.1 {
 		if nestedIndex > 0 {
-			iterate(nestedIndex - 1, append(args, i), fn)
+			iterate(nestedIndex-1, append(args, i), fn)
 		} else {
 			fn(append(args, i))
 		}
@@ -21,8 +21,8 @@ func iterate(nestedIndex uint, args []float64, fn checkFn) {
 
 func TestParseOperations(t *testing.T) {
 	type Case struct {
-		name string
-		input io.Reader
+		name   string
+		input  io.Reader
 		result []painter.Operation
 	}
 
@@ -30,28 +30,28 @@ func TestParseOperations(t *testing.T) {
 		{name: "white", input: bytes.NewBufferString("white\nupdate"), result: []painter.Operation{painter.NewWhiteFill()}},
 		{name: "green", input: bytes.NewBufferString("green\nupdate"), result: []painter.Operation{painter.NewGreenFill()}},
 		{
-			name: "white-green",
-			input: bytes.NewBufferString("white\ngreen\nupdate"),
+			name:   "white-green",
+			input:  bytes.NewBufferString("white\ngreen\nupdate"),
 			result: []painter.Operation{painter.NewWhiteFill(), painter.NewGreenFill()},
 		},
 		{
-			name: "tfigure",
-			input: bytes.NewBufferString("figure 0.25 0.25\nupdate"),
+			name:   "tfigure",
+			input:  bytes.NewBufferString("figure 0.25 0.25\nupdate"),
 			result: []painter.Operation{painter.NewTFigure(0.25, 0.25)},
 		},
 		{
-			name: "brect",
-			input: bytes.NewBufferString("brect 0.25 0.25 0.75 0.75\nupdate"),
+			name:   "brect",
+			input:  bytes.NewBufferString("brect 0.25 0.25 0.75 0.75\nupdate"),
 			result: []painter.Operation{painter.NewBRect(0.25, 0.25, 0.75, 0.75)},
 		},
 		{
-			name: "move",
-			input: bytes.NewBufferString("move 0.25 0.25\nupdate"),
+			name:   "move",
+			input:  bytes.NewBufferString("move 0.25 0.25\nupdate"),
 			result: []painter.Operation{painter.NewMove(0.25, 0.25)},
 		},
 		{
-			name: "reset",
-			input: bytes.NewBufferString("reset"),
+			name:   "reset",
+			input:  bytes.NewBufferString("reset"),
 			result: []painter.Operation{painter.Reset{}},
 		},
 	}
@@ -85,8 +85,8 @@ func TestParseOperations(t *testing.T) {
 		y := args[1]
 		inputStr := fmt.Sprintf("figure %v %v\nupdate", x, y)
 		c := Case{
-			name: "Operation: " + inputStr,
-			input: bytes.NewBufferString(inputStr),
+			name:   "Operation: " + inputStr,
+			input:  bytes.NewBufferString(inputStr),
 			result: []painter.Operation{painter.NewTFigure(x, y)},
 		}
 
@@ -113,8 +113,8 @@ func TestParseOperations(t *testing.T) {
 		y2 := args[3]
 		inputStr := fmt.Sprintf("brect %v %v %v %v\nupdate", x1, y1, x2, y2)
 		c := Case{
-			name: "Operation: " + inputStr,
-			input: bytes.NewBufferString(inputStr),
+			name:   "Operation: " + inputStr,
+			input:  bytes.NewBufferString(inputStr),
 			result: []painter.Operation{painter.NewBRect(x1, y1, x2, y2)},
 		}
 
@@ -139,8 +139,8 @@ func TestParseOperations(t *testing.T) {
 		y := args[1]
 		inputStr := fmt.Sprintf("move %v %v\nupdate", x, y)
 		c := Case{
-			name: "Operation: " + inputStr,
-			input: bytes.NewBufferString(inputStr),
+			name:   "Operation: " + inputStr,
+			input:  bytes.NewBufferString(inputStr),
 			result: []painter.Operation{painter.NewMove(x, y)},
 		}
 
@@ -161,38 +161,38 @@ func TestParseOperations(t *testing.T) {
 
 	spacesCases := []Case{
 		{
-			name: "white-space",
-			input: bytes.NewBufferString("white                    \nupdate    "),
+			name:   "white-space",
+			input:  bytes.NewBufferString("white                    \nupdate    "),
 			result: []painter.Operation{painter.NewWhiteFill()},
 		},
 		{
-			name: "green-space",
-			input: bytes.NewBufferString("green	\n	update"),
+			name:   "green-space",
+			input:  bytes.NewBufferString("green	\n	update"),
 			result: []painter.Operation{painter.NewGreenFill()},
 		},
 		{
-			name: "white-green-space",
-			input: bytes.NewBufferString("	\v\n\t	white\ngreen		\nupdate"),
+			name:   "white-green-space",
+			input:  bytes.NewBufferString("	\v\n\t	white\ngreen		\nupdate"),
 			result: []painter.Operation{painter.NewWhiteFill(), painter.NewGreenFill()},
 		},
 		{
-			name: "tfigure-space",
-			input: bytes.NewBufferString("figure 0.3	\t	0.5 \nupdate"),
+			name:   "tfigure-space",
+			input:  bytes.NewBufferString("figure 0.3	\t	0.5 \nupdate"),
 			result: []painter.Operation{painter.NewTFigure(0.3, 0.5)},
 		},
 		{
-			name: "brect-space",
-			input: bytes.NewBufferString("brect		0.007 \t0.02    0.000009 0.75\nupdate"),
+			name:   "brect-space",
+			input:  bytes.NewBufferString("brect		0.007 \t0.02    0.000009 0.75\nupdate"),
 			result: []painter.Operation{painter.NewBRect(0.007, 0.02, 0.000009, 0.75)},
 		},
 		{
-			name: "move-space",
-			input: bytes.NewBufferString("move -0.6			 -0.7\nupdate\n\n\n\n"),
+			name:   "move-space",
+			input:  bytes.NewBufferString("move -0.6			 -0.7\nupdate\n\n\n\n"),
 			result: []painter.Operation{painter.NewMove(-0.6, -0.7)},
 		},
 		{
-			name: "reset-space",
-			input: bytes.NewBufferString("reset    "),
+			name:   "reset-space",
+			input:  bytes.NewBufferString("reset    "),
 			result: []painter.Operation{painter.Reset{}},
 		},
 	}
@@ -201,7 +201,7 @@ func TestParseOperations(t *testing.T) {
 
 	complexCases := []Case{
 		{
-			name: "white-tfigure-brect-brect-move",
+			name:  "white-tfigure-brect-brect-move",
 			input: bytes.NewBufferString("white\n\t\n figure		0.1 0.5       \nbrect 0.25 0.25 0.75 0.75   \n brect 0.3 0.5 0.0 0.2 \nmove 0.1    0.7\nupdate"),
 			result: []painter.Operation{
 				painter.NewWhiteFill(),
@@ -212,7 +212,7 @@ func TestParseOperations(t *testing.T) {
 			},
 		},
 		{
-			name: "white-green-tfigure-move",
+			name:  "white-green-tfigure-move",
 			input: bytes.NewBufferString("white\ngreen   \n\n\n\n\n\nfigure		0.1 0.5       \nmove 0.1    0.7\nupdate"),
 			result: []painter.Operation{
 				painter.NewWhiteFill(),
@@ -222,7 +222,7 @@ func TestParseOperations(t *testing.T) {
 			},
 		},
 		{
-			name: "tfigure-tfigure-move-green",
+			name:  "tfigure-tfigure-move-green",
 			input: bytes.NewBufferString("figure		0.01 0.85      \nfigure		0.41 0.85 \nmove 0.81    0.31\n green\nupdate"),
 			result: []painter.Operation{
 				painter.NewTFigure(0.01, 0.85),
@@ -235,4 +235,3 @@ func TestParseOperations(t *testing.T) {
 
 	checkCasesFn(complexCases)
 }
-

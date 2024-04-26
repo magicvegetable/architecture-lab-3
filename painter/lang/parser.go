@@ -1,14 +1,14 @@
 package lang
 
 import (
-	"io"
 	"fmt"
-	"strconv"
+	"io"
 	"regexp"
+	"strconv"
 
 	"bufio"
-	"strings"
 	"github.com/magicvegetable/architecture-lab-3/painter"
+	"strings"
 )
 
 type Parser struct {
@@ -100,7 +100,7 @@ func GetOperation(command string) (painter.Operation, error) {
 		}
 
 		return fn(x1, y1, x2, y2), nil
-	
+
 	case painter.CreateMove:
 		if lenArgs := len(args); lenArgs != 2 {
 			errMessage := fmt.Sprintf(
@@ -196,4 +196,3 @@ func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
 
 	return opsToApply, nil
 }
-

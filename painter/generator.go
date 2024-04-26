@@ -11,15 +11,15 @@ type TextureGenerator interface {
 }
 
 type Store struct {
-	tfigures []*TFigure
+	tfigures    []*TFigure
 	backgrounds []*Fill
-	brect *BRect
-	moves []*Move
+	brect       *BRect
+	moves       []*Move
 
-	tfiguresM sync.Mutex
+	tfiguresM    sync.Mutex
 	backgroundsM sync.Mutex
-	brectM sync.Mutex
-	movesM sync.Mutex
+	brectM       sync.Mutex
+	movesM       sync.Mutex
 }
 
 func (store *Store) Lock() {
@@ -38,7 +38,7 @@ func (store *Store) Unlock() {
 
 type Generator struct {
 	store Store
-	Scr screen.Screen
+	Scr   screen.Screen
 }
 
 func (gn *Generator) Update(op Operation) {
@@ -47,11 +47,11 @@ func (gn *Generator) Update(op Operation) {
 	gn.store.Lock()
 
 	switch op := op.(type) {
-	case Fill: 
+	case Fill:
 		gn.store.backgrounds = append(gn.store.backgrounds, &op)
-	case TFigure: 
+	case TFigure:
 		gn.store.tfigures = append(gn.store.tfigures, &op)
-	case BRect: 
+	case BRect:
 		gn.store.brect = &op
 	case Move:
 		op.SetRange(gn.store.tfigures)
@@ -124,4 +124,3 @@ func (gn *Generator) GetTFigures() (tfs []*TFigure) {
 func (gn *Generator) SetScreen(scr screen.Screen) {
 	gn.Scr = scr
 }
-
