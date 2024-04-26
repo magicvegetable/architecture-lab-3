@@ -185,6 +185,27 @@ func NewBRect(x1, y1, x2, y2 float64) BRect {
 type Move struct {
 	Dest                Point
 	originalTextureRect *image.Rectangle
+	Range []*TFigure
+}
+
+func (mv *Move) SetRange(tfs []*TFigure) {
+	mv.Range = make([]*TFigure, len(tfs))
+	copy(mv.Range, tfs)
+}
+
+func (mv *Move) Move(t screen.Texture) {
+	tfs := mv.Range
+
+	if mv.originalTextureRect == nil {
+		fullRect := t.Bounds()
+		mv.originalTextureRect = &fullRect
+	}
+
+	realDest := convertPointToImagePoint(mv.Dest, *mv.originalTextureRect)
+
+	for _, tf := range tfs {
+		tf.Move(realDest)
+	}
 }
 
 func (mv *Move) MoveTFigures(tfs []TFigure, t screen.Texture) {

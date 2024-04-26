@@ -20,8 +20,13 @@ func main() {
 
 
 	pv.Title = "Simple painter"
+	opLoop.ClickH.GetTFigures = opLoop.Gen.GetTFigures
+	opLoop.AddDefaultElements()
+	opLoop.Receiver = &pv
 
+	pv.HandleClick = opLoop.ClickH.Update
 	pv.OnScreenReady = opLoop.Start
+	pv.GetTexture = opLoop.Gen.Generate
 	pv.StopLoop = opLoop.Terminate
 	opLoop.Receiver = &pv
 

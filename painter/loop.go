@@ -2,7 +2,6 @@ package painter
 
 import (
 	"sync"
-
 	"golang.org/x/exp/shiny/screen"
 )
 
@@ -63,7 +62,7 @@ func (q *eventQueue) Pull() Operation {
 }
 
 type Receiver interface {
-	Receive(op Operation)
+	Update()
 }
 
 type Loop struct {
@@ -72,12 +71,18 @@ type Loop struct {
 	queue eventQueue
 
 	terminated chan struct{}
+
+	Gen Generator
+
+	ClickH ClickHandler
 }
 
 func (l *Loop) Start(s screen.Screen) {
-	go func() {
-		l.terminated = make(chan struct{})
-		l.queue.terminate = false
+	l.Gen.Scr = scr
+	
+		go func() {
+			l.terminated = make(chan struct{})
+			l.queue.terminate = false
 
 		for {
 			op := l.queue.Pull()
@@ -86,7 +91,9 @@ func (l *Loop) Start(s screen.Screen) {
 				break
 			}
 
-			l.Receiver.Receive(op)
+			l.Gen.Update(op)
+
+			l.Receiver.Update()
 		}
 
 		close(l.terminated)
@@ -113,5 +120,11 @@ func (l *Loop) PostOperation(op Operation) {
 func (l *Loop) PostOperations(ops []Operation) {
 	for _, op := range ops {
 		l.PostOperation(op)
+	}
+	func (l *Loop) AddDefaultElements() {
+		bck := NewGreenFill()
+		tf := NewTFigure(0.5, 0.5)
+		l.Gen.Update(bck)
+		l.Gen.Update(tf)
 	}
 }
