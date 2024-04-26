@@ -17,6 +17,8 @@ type eventQueue struct {
 	head, tail *queueElement
 
 	blocked chan struct{}
+
+	terminate bool
 }
 
 func (q *eventQueue) Push(op Operation) {
@@ -50,6 +52,10 @@ func (q *eventQueue) Pull() Operation {
 		<-q.blocked
 		q.m.Lock()
 	}
+	if q.terminate {
+		return nil
+	}
+
 
 	e := q.head.value
 	q.head = q.head.next
@@ -65,26 +71,47 @@ type Loop struct {
 
 	queue eventQueue
 
-	terminate bool
+	terminated chan struct{}
 }
 
 func (l *Loop) Start(s screen.Screen) {
 	go func() {
-		l.terminate = false
+		l.terminated = make(chan struct{})
+		l.queue.terminate = false
 
-		for !l.terminate {
+		for {
 			op := l.queue.Pull()
+
+			if op == nil {
+				break
+			}
+
 			l.Receiver.Receive(op)
 		}
+
+		close(l.terminated)
 	}()
 }
 
-func (l *Loop) PostEvent(op Operation) {
+func (l *Loop) Terminate() {
+	l.queue.m.Lock()
+
+	l.queue.terminate = true
+
+	if l.queue.blocked != nil {
+		close(l.queue.blocked)
+		l.queue.blocked = nil
+	}
+
+	l.queue.m.Unlock()
+
+	<- l.terminated
+}
+func (l *Loop) PostOperation(op Operation) {
 	l.queue.Push(op)
 }
-
-func (l *Loop) PostEvents(ops []Operation) {
+func (l *Loop) PostOperations(ops []Operation) {
 	for _, op := range ops {
-		l.PostEvent(op)
+		l.PostOperation(op)
 	}
 }

@@ -68,14 +68,15 @@ func (el *ElementsToDraw) Unlock() {
 }
 
 type Visualizer struct {
-	Title         string
-	Debug         bool
+	Title string
+	Debug bool
 	OnScreenReady func(s screen.Screen)
+	StopLoop func()
 
-	w    screen.Window
+	w screen.Window
 	done chan struct{}
 
-	sz  size.Event
+	sz size.Event
 	pos image.Rectangle
 
 	operations chan painter.Operation
@@ -170,6 +171,7 @@ func (pw *Visualizer) run(s screen.Screen) {
 		select {
 		case e, ok := <-events:
 			if !ok {
+				pw.StopLoop()
 				return
 			}
 			pw.handleEvent(e, t)
@@ -379,7 +381,7 @@ func (pw *Visualizer) GetElementsToDraw() (elements []DrawableElement) {
 	pw.elementsToDraw.Lock()
 
 	elements = append(elements, pw.elementsToDraw.backgrounds...)
-	
+
 	if pw.elementsToDraw.brect != nil {
 		elements = append(elements, pw.elementsToDraw.brect)
 	}

@@ -6,22 +6,23 @@ import (
 	"github.com/magicvegetable/architecture-lab-3/painter"
 	"github.com/magicvegetable/architecture-lab-3/painter/lang"
 	"github.com/magicvegetable/architecture-lab-3/ui"
-	// "fmt"
+
 )
 
 func main() {
 	var (
-		pv ui.Visualizer // Візуалізатор створює вікно та малює у ньому.
+		pv ui.Visualizer
 
 		// Потрібні для частини 2.
-		opLoop painter.Loop // Цикл обробки команд.
-		parser lang.Parser  // Парсер команд.
+		opLoop painter.Loop 
+		parser lang.Parser 
 	)
 
-	//pv.Debug = true
+
 	pv.Title = "Simple painter"
 
 	pv.OnScreenReady = opLoop.Start
+	pv.StopLoop = opLoop.Terminate
 	opLoop.Receiver = &pv
 
 	go func() {
