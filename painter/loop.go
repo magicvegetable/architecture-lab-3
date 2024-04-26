@@ -1,16 +1,15 @@
 package painter
 
-import (
-	"sync"
-	"golang.org/x/exp/shiny/screen"
-)
+import "sync"
+import "golang.org/x/exp/shiny/screen"
+
 
 type queueElement struct {
 	value Operation
-	next  *queueElement
+	next *queueElement
 }
 
-type eventQueue struct {
+type operationQueue struct {
 	m sync.Mutex
 
 	head, tail *queueElement
@@ -20,7 +19,7 @@ type eventQueue struct {
 	terminate bool
 }
 
-func (q *eventQueue) Push(op Operation) {
+func (q *operationQueue) Push(op Operation) {
 	defer q.m.Unlock()
 	q.m.Lock()
 
@@ -40,25 +39,29 @@ func (q *eventQueue) Push(op Operation) {
 
 }
 
-func (q *eventQueue) Pull() Operation {
+func (q *operationQueue) Pull() Operation {
 	defer q.m.Unlock()
 	q.m.Lock()
+
+	if q.terminate {
+		return nil
+	}
 
 	if q.head == nil {
 		q.blocked = make(chan struct{})
 		q.m.Unlock()
 
-		<-q.blocked
+		<- q.blocked
 		q.m.Lock()
-	}
-	if q.terminate {
-		return nil
+
+		if q.terminate {
+			return nil
+		}
 	}
 
-
-	e := q.head.value
+	op := q.head.value
 	q.head = q.head.next
-	return e
+	return op
 }
 
 type Receiver interface {
@@ -68,21 +71,19 @@ type Receiver interface {
 type Loop struct {
 	Receiver Receiver
 
-	queue eventQueue
+	queue operationQueue
 
 	terminated chan struct{}
 
-	Gen Generator
-
-	ClickH ClickHandler
+	Gen TextureGenerator
 }
 
-func (l *Loop) Start(s screen.Screen) {
-	l.Gen.Scr = scr
-	
-		go func() {
-			l.terminated = make(chan struct{})
-			l.queue.terminate = false
+func (l *Loop) Start(scr screen.Screen) {
+	l.Gen.SetScreen(scr)
+
+	go func() {
+		l.terminated = make(chan struct{})
+		l.queue.terminate = false
 
 		for {
 			op := l.queue.Pull()
@@ -114,17 +115,21 @@ func (l *Loop) Terminate() {
 
 	<- l.terminated
 }
+
 func (l *Loop) PostOperation(op Operation) {
 	l.queue.Push(op)
 }
+
 func (l *Loop) PostOperations(ops []Operation) {
 	for _, op := range ops {
 		l.PostOperation(op)
 	}
-	func (l *Loop) AddDefaultElements() {
-		bck := NewGreenFill()
-		tf := NewTFigure(0.5, 0.5)
-		l.Gen.Update(bck)
-		l.Gen.Update(tf)
-	}
 }
+
+func (l *Loop) AddDefaultElements() {
+	bck := NewGreenFill()
+	tf := NewTFigure(0.5, 0.5)
+	l.Gen.Update(bck)
+	l.Gen.Update(tf)
+}
+

@@ -6,29 +6,31 @@ import (
 	"github.com/magicvegetable/architecture-lab-3/painter"
 	"github.com/magicvegetable/architecture-lab-3/painter/lang"
 	"github.com/magicvegetable/architecture-lab-3/ui"
-
 )
 
 func main() {
 	var (
 		pv ui.Visualizer
 
-		// Потрібні для частини 2.
-		opLoop painter.Loop 
-		parser lang.Parser 
+		opLoop painter.Loop
+		parser lang.Parser
+		clickH painter.ClickHandler
 	)
 
-
 	pv.Title = "Simple painter"
-	opLoop.ClickH.GetTFigures = opLoop.Gen.GetTFigures
+
+	gen := painter.Generator{}
+
+	clickH.GetTFigures = gen.GetTFigures
+
+	opLoop.Gen = &gen
 	opLoop.AddDefaultElements()
 	opLoop.Receiver = &pv
 
-	pv.HandleClick = opLoop.ClickH.Update
+	pv.HandleClick = clickH.Update
 	pv.OnScreenReady = opLoop.Start
 	pv.GetTexture = opLoop.Gen.Generate
 	pv.StopLoop = opLoop.Terminate
-	opLoop.Receiver = &pv
 
 	go func() {
 		http.Handle("/", lang.HttpHandler(&opLoop, &parser))

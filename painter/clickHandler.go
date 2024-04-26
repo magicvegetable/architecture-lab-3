@@ -43,7 +43,7 @@ func (cl *ClickHandler) releaseTFigure() {
 }
 
 func (cl *ClickHandler) Update(e mouse.Event) bool {
-	if e.Button == mouse.ButtonLeft {
+	if e.Button == mouse.ButtonRight {
 		dest := image.Point{int(e.X), int(e.Y)}
 		cl.pressed = !cl.pressed
 		if cl.pressed {
@@ -93,3 +93,4 @@ func (cl *ClickHandler) handle(dest image.Point) {
 	cl.start.X = dest.X
 	cl.start.Y = dest.Y
 }
+

@@ -4,6 +4,12 @@ import "image"
 import "golang.org/x/exp/shiny/screen"
 import "sync"
 
+type TextureGenerator interface {
+	SetScreen(scr screen.Screen)
+	Update(op Operation)
+	Generate(size image.Point) (screen.Texture, error)
+}
+
 type Store struct {
 	tfigures []*TFigure
 	backgrounds []*Fill
@@ -62,7 +68,7 @@ type DrawableElement interface {
 	Draw(t screen.Texture)
 }
 
-func (gn *Generator) GetGenerationData() (elements []DrawableElement, moves []*Move) {
+func (gn *Generator) getGenerationData() (elements []DrawableElement, moves []*Move) {
 	defer gn.store.Unlock()
 
 	gn.store.Lock()
@@ -92,7 +98,7 @@ func (gn *Generator) Generate(size image.Point) (screen.Texture, error) {
 		return nil, err
 	}
 
-	elements, moves := gn.GetGenerationData()
+	elements, moves := gn.getGenerationData()
 
 	for _, move := range moves {
 		move.Move(t)
@@ -114,3 +120,8 @@ func (gn *Generator) GetTFigures() (tfs []*TFigure) {
 
 	return
 }
+
+func (gn *Generator) SetScreen(scr screen.Screen) {
+	gn.Scr = scr
+}
+

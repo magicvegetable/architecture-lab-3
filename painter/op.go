@@ -1,18 +1,11 @@
 package painter
 
-import (
-	"fmt"
-	"image"
-	"image/color"
+import "image"
+import "fmt"
+import "golang.org/x/exp/shiny/screen"
+import "image/color"
 
-	"golang.org/x/exp/shiny/screen"
-)
-
-type Operation interface{}
-
-type Moveable interface {
-	Move(v image.Point)
-}
+type Operation interface {}
 
 type Point struct {
 	X float64
@@ -26,8 +19,8 @@ type Rectangle struct {
 
 func convertPointToImagePoint(p Point, size image.Rectangle) image.Point {
 	pointInImage := image.Point{
-		X: size.Min.X + int(float64(size.Max.X-size.Min.X)*p.X),
-		Y: size.Min.Y + int(float64(size.Max.Y-size.Min.Y)*p.Y),
+		X: size.Min.X + int(float64(size.Max.X - size.Min.X) * p.X),
+		Y: size.Min.Y + int(float64(size.Max.Y - size.Min.Y) * p.Y),
 	}
 	return pointInImage
 }
@@ -45,14 +38,14 @@ func NewGreenFill() Fill {
 }
 
 func NewWhiteFill() Fill {
-	return Fill{color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}}
+	return Fill{color.RGBA{R:0xff, G: 0xff, B: 0xff, A:0xff}}
 }
 
 type TFigure struct {
-	Color               color.RGBA
-	Center              Point
+	Color color.RGBA
+	Center Point
 	originalTextureRect *image.Rectangle
-	Size                Point
+	Size Point
 }
 
 var TFigureColor = color.RGBA{255, 102, 102, 255}
@@ -64,23 +57,23 @@ func (tf *TFigure) getRectangles() (image.Rectangle, image.Rectangle, error) {
 
 	horizontal := *tf.originalTextureRect
 	vertical := *tf.originalTextureRect
-
+	
 	centerInTexture := convertPointToImagePoint(tf.Center, horizontal)
 
 	sizeInTexture := image.Point{
-		X: int(float64(horizontal.Max.X-horizontal.Min.X) * tf.Size.X),
-		Y: int(float64(horizontal.Max.Y-horizontal.Min.Y) * tf.Size.Y),
+		X: int(float64(horizontal.Max.X - horizontal.Min.X) * tf.Size.X),
+		Y: int(float64(horizontal.Max.Y - horizontal.Min.Y) * tf.Size.Y),
 	}
 
-	horizontal.Min.Y = centerInTexture.Y - int(float64(sizeInTexture.Y)*0.5)
+	horizontal.Min.Y = centerInTexture.Y - int(float64(sizeInTexture.Y) * 0.5)
 	horizontal.Max.Y = centerInTexture.Y
-	horizontal.Min.X = centerInTexture.X - int(float64(sizeInTexture.X)*0.5)
-	horizontal.Max.X = centerInTexture.X + int(float64(sizeInTexture.X)*0.5)
+	horizontal.Min.X = centerInTexture.X - int(float64(sizeInTexture.X) * 0.5)
+	horizontal.Max.X = centerInTexture.X + int(float64(sizeInTexture.X) * 0.5)
 
 	vertical.Min.Y = horizontal.Min.Y
-	vertical.Max.Y = centerInTexture.Y + int(float64(sizeInTexture.Y)*0.5)
-	vertical.Max.X = centerInTexture.X + int(float64(sizeInTexture.X)*0.25)
-	vertical.Min.X = centerInTexture.X - int(float64(sizeInTexture.X)*0.25)
+	vertical.Max.Y = centerInTexture.Y + int(float64(sizeInTexture.Y) * 0.5)
+	vertical.Max.X = centerInTexture.X + int(float64(sizeInTexture.X) * 0.25)
+	vertical.Min.X = centerInTexture.X - int(float64(sizeInTexture.X) * 0.25)
 
 	return horizontal, vertical, nil
 }
@@ -122,16 +115,16 @@ func (tf *TFigure) Draw(t screen.Texture) {
 func NewTFigure(x, y float64) TFigure {
 	center := Point{x, y}
 	return TFigure{
-		Color:               TFigureColor,
-		Center:              center,
+		Color: TFigureColor,
+		Center: center,
 		originalTextureRect: nil,
-		Size:                Point{0.25, 0.25}, // default size
+		Size: Point{0.25, 0.25}, // default size
 	}
 }
 
 type BRect struct {
 	originalTextureRect *image.Rectangle
-	Bounds              Rectangle
+	Bounds Rectangle
 }
 
 func (brect *BRect) getRectToFill() (image.Rectangle, error) {
@@ -155,7 +148,7 @@ func (brect *BRect) Draw(t screen.Texture) {
 
 	rectToFill, _ := brect.getRectToFill()
 
-	t.Fill(rectToFill, color.RGBA{A: 0xff}, screen.Src)
+	t.Fill(rectToFill, color.RGBA{A:0xff}, screen.Src)
 }
 
 func NewBRect(x1, y1, x2, y2 float64) BRect {
@@ -181,14 +174,14 @@ func NewBRect(x1, y1, x2, y2 float64) BRect {
 
 	return BRect{
 		originalTextureRect: nil,
-		Bounds:              bounds,
+		Bounds: bounds,
 	}
 }
 
 type Move struct {
-	Dest                Point
+	Dest Point
 	originalTextureRect *image.Rectangle
-	Range               []*TFigure
+	Range []*TFigure
 }
 
 func (mv *Move) SetRange(tfs []*TFigure) {
@@ -216,28 +209,29 @@ func NewMove(x, y float64) Move {
 	return Move{Dest: dest, originalTextureRect: nil}
 }
 
-type Reset struct{}
+type Reset struct {}
 
 type FillCreateFn func() Fill
 
 type CreateTFigureFn func(x, y float64) TFigure
 
-type UpdatePoint struct{}
+type UpdatePoint struct {}
 
 type CreateBRect func(x1, y1, x2, y2 float64) BRect
 
 type CreateMove func(x, y float64) Move
 
 var Table = map[string]Operation{
-	"white":  FillCreateFn(NewWhiteFill),
-	"green":  FillCreateFn(NewGreenFill),
+	"white": FillCreateFn(NewWhiteFill),
+	"green": FillCreateFn(NewGreenFill),
 	"figure": CreateTFigureFn(NewTFigure),
 	"update": UpdatePoint{},
-	"brect":  CreateBRect(NewBRect),
-	"move":   CreateMove(NewMove),
-	"reset":  Reset{},
+	"brect": CreateBRect(NewBRect),
+	"move": CreateMove(NewMove),
+	"reset": Reset{},
 }
 
 func GetTable() map[string]Operation {
 	return Table
 }
+

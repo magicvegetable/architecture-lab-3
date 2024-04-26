@@ -1,20 +1,20 @@
 package lang
 
 import (
-	"fmt"
 	"io"
-	"regexp"
+	"fmt"
 	"strconv"
+	"regexp"
 
 	"bufio"
-	"github.com/magicvegetable/architecture-lab-3/painter"
 	"strings"
+	"github.com/magicvegetable/architecture-lab-3/painter"
 )
-
 
 type Parser struct {
 	savedOperationsPool []painter.Operation
 }
+
 var table = painter.GetTable()
 
 func GetOperation(command string) (painter.Operation, error) {
@@ -170,11 +170,13 @@ func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
 				updateToIndex = len(parsedOps)
 				continue
 			}
+
 			if op == table["reset"] {
 				parsedOps = []painter.Operation{op}
 				updateToIndex = 1
 				continue
 			}
+
 			parsedOps = append(parsedOps, op)
 		}
 	}
@@ -194,3 +196,4 @@ func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
 
 	return opsToApply, nil
 }
+

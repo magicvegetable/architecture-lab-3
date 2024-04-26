@@ -1,15 +1,17 @@
 .PHONY: clean all
 
-all: build/main
+exe := build/main
+src := $(shell find . -type f -name '*.go')
 
-src := cmd/painter/main.go painter/op.go painter/loop.go painter/lang/http.go painter/lang/parser.go ui/window.go
+all: $(exe)
 
 test:
 	go test ./...
 
-build/main: $(src)
+$(exe): $(src)
 	mkdir -p build
-	go build -compiler=gc -o build/main ./cmd/painter
+	go build -compiler=gc -o $@ ./cmd/painter
 
 clean:
 	rm -rf build
+

@@ -3,9 +3,7 @@ package ui
 import (
 	"image"
 	"log"
-	
 
-	"github.com/magicvegetable/architecture-lab-3/painter"
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/draw"
@@ -19,6 +17,7 @@ import (
 type Visualizer struct {
 	Title string
 	Debug bool
+
 	OnScreenReady func(s screen.Screen)
 	StopLoop func()
 	GetTexture func(p image.Point) (screen.Texture, error)
@@ -31,19 +30,18 @@ type Visualizer struct {
 }
 
 func (pw *Visualizer) Main() {
-	
 	pw.done = make(chan struct{})
 
 	driver.Main(pw.run)
 }
 
-
 func (pw *Visualizer) run(s screen.Screen) {
 	w, err := s.NewWindow(&screen.NewWindowOptions{
-		Title:  pw.Title,
-		Width:  800,
+		Title: pw.Title,
+		Width: 800,
 		Height: 800,
 	})
+
 
 	if err != nil {
 		log.Fatal("Failed to initialize the app window:", err)
@@ -74,7 +72,6 @@ func (pw *Visualizer) run(s screen.Screen) {
 		}
 	}()
 
-	
 	for {
 		select {
 		case e, ok := <-events:
@@ -101,8 +98,6 @@ func detectTerminate(e any) bool {
 	return false
 }
 
-
-
 func (pw *Visualizer) handleEvent(e any) {
 	switch e := e.(type) {
 
@@ -114,6 +109,7 @@ func (pw *Visualizer) handleEvent(e any) {
 
 	case mouse.Event:
 		update := pw.HandleClick(e)
+
 		if update {
 			pw.w.Send(paint.Event{})
 		}
@@ -122,16 +118,20 @@ func (pw *Visualizer) handleEvent(e any) {
 		t, err := pw.GetTexture(pw.sz.Size())
 
 		if err != nil {
-			// TODO: close window + stop loop
+			log.Printf("ERROR: %s", err)
+			pw.w.Send(lifecycle.Event{To: lifecycle.StageDead})
+			return
 		}
 
 		pw.w.Scale(pw.sz.Bounds(), t, t.Bounds(), draw.Src, nil)
 
 		t.Release()
 
-		pw.w.Publish() }
-}	
+		pw.w.Publish()
+	}
+}
 
 func (pw *Visualizer) Update() {
 	pw.w.Send(paint.Event{})
 }
+
