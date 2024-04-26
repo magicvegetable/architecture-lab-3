@@ -1,39 +1,49 @@
 package lang
 
 import (
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/magicvegetable/architecture-lab-3/painter"
-	// "bufio"
+	"sync"
 )
 
-// HttpHandler конструює обробник HTTP запитів, який дані з запиту віддає у Parser, а потім відправляє отриманий список
-// операцій у painter.Loop.
 func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
+
+	var parserM, posterM sync.Mutex
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		var in io.Reader = r.Body
+
 		if r.Method == http.MethodGet {
 			in = strings.NewReader(r.URL.Query().Get("cmd"))
 		}
 
-		cmds, err := p.Parse(in)
+		parserM.Lock()
+
+		events, err := p.ParseEvents(in)
+
 		if err != nil {
-			log.Printf("Bad script: %s", err)
+			// TODO: handle errors
+			println(err)
 			rw.WriteHeader(http.StatusBadRequest)
+			parserM.Unlock()
 			return
 		}
+
 		if len(events) != 0 {
 			go func() {
+				posterM.Lock()
+				parserM.Unlock()
+
 				loop.PostEvents(events)
+
+				posterM.Unlock()
 			}()
+		} else {
+			parserM.Unlock()
 		}
 
-		fmt.Println("before:", cmds)
-		loop.PostOps(painter.OperationList(cmds))
 		rw.WriteHeader(http.StatusOK)
 	})
 }

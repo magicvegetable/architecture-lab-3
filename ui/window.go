@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"log"
 	"reflect"
+	"sync"
 
 	"fmt"
 	"github.com/magicvegetable/architecture-lab-3/event"
@@ -31,6 +32,22 @@ type ElementsToDraw struct {
 	tfigures    []DrawableElement
 	backgrounds []DrawableElement
 	brects      []DrawableElement
+
+	tfiguresM    sync.Mutex
+	backgroundsM sync.Mutex
+	brectsM      sync.Mutex
+}
+
+func (el *ElementsToDraw) Lock() {
+	el.tfiguresM.Lock()
+	el.backgroundsM.Lock()
+	el.brectsM.Lock()
+}
+
+func (el *ElementsToDraw) Unlock() {
+	el.brectsM.Unlock()
+	el.backgroundsM.Unlock()
+	el.tfiguresM.Unlock()
 }
 
 type Visualizer struct {
@@ -48,6 +65,7 @@ type Visualizer struct {
 	moves          []MoveTFigures
 	elementsToDraw ElementsToDraw
 	scr            screen.Screen
+	handledM       sync.Mutex
 }
 
 var evi = int(0)
@@ -56,6 +74,8 @@ func (pw *Visualizer) Receive(Event any) {
 	fmt.Println("Events index", evi)
 	fmt.Println("New Event:", Event)
 	evi += 1
+
+	pw.handledM.Lock()
 	pw.events <- Event
 }
 
@@ -124,10 +144,12 @@ func (pw *Visualizer) run(s screen.Screen) {
 			pw.handleEvent(e, t)
 
 		case e, ok := <-pw.events:
+
 			if !ok {
 				return
 			}
 			pw.handleCommandEvent(e)
+			pw.handledM.Unlock()
 		}
 	}
 }
@@ -158,6 +180,9 @@ func ConvertToTFigure(el any) (*event.TFigure, bool) {
 }
 
 func (pw *Visualizer) GetTopMouseFigureUnderPoint(p image.Point) (*event.TFigure, bool) {
+	defer pw.elementsToDraw.tfiguresM.Unlock()
+	pw.elementsToDraw.tfiguresM.Lock()
+
 	for i := len(pw.elementsToDraw.tfigures) - 1; i >= 0; i-- {
 		el := pw.elementsToDraw.tfigures[i]
 
@@ -205,8 +230,34 @@ func (pw *Visualizer) setupMouseEvent(sp image.Point) {
 	mouseEventData.start = sp
 }
 
+func (pw *Visualizer) grabbedTFigureIsPresent() bool {
+	defer pw.elementsToDraw.tfiguresM.Unlock()
+	pw.elementsToDraw.tfiguresM.Lock()
+
+	for i := len(pw.elementsToDraw.tfigures) - 1; i >= 0; i-- {
+		el := pw.elementsToDraw.tfigures[i]
+
+		tf, ok := ConvertToTFigure(el)
+
+		if !ok {
+			continue
+		}
+
+		if tf == mouseEventData.tf {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (pw *Visualizer) handleMouseEvent(dest image.Point) {
 	if !mouseEventData.handle {
+		return
+	}
+
+	if !pw.grabbedTFigureIsPresent() {
+		// TODO: reset mouse event
 		return
 	}
 
@@ -222,6 +273,9 @@ func (pw *Visualizer) handleMouseEvent(dest image.Point) {
 }
 
 func (pw *Visualizer) handleCommandEvent(e any) {
+	defer pw.elementsToDraw.Unlock()
+	pw.elementsToDraw.Lock()
+
 	switch e := e.(type) {
 	case event.Fill:
 		pw.elementsToDraw.backgrounds = append(pw.elementsToDraw.backgrounds, &e)
@@ -233,7 +287,7 @@ func (pw *Visualizer) handleCommandEvent(e any) {
 		pw.moves = append(pw.moves, &e)
 	case event.Reset:
 		pw.elementsToDraw.backgrounds = pw.elementsToDraw.backgrounds[:0]
-		pw.elementsToDraw.tfigures = pw.elementsToDraw.brects[:0]
+		pw.elementsToDraw.tfigures = pw.elementsToDraw.tfigures[:0]
 		pw.elementsToDraw.brects = pw.elementsToDraw.brects[:0]
 	}
 	pw.w.Send(paint.Event{})
@@ -282,18 +336,27 @@ func (pw *Visualizer) handleMoves(texture screen.Texture) {
 		return
 	}
 
-	var tfs []event.TFigure
+	tfs := make([]event.TFigure, len(pw.elementsToDraw.tfigures))
 
-	for _, tfel := range pw.elementsToDraw.tfigures {
-		tf, _ := ConvertToTFigure(tfel)
-		tfs = append(tfs, *tf)
+	for i, tfel := range pw.elementsToDraw.tfigures {
+		tfs[i] = *tfel.(*event.TFigure)
 	}
 
 	for _, mv := range pw.moves {
 		mv.MoveTFigures(tfs, texture)
 	}
 
-	pw.moves = []MoveTFigures{}
+	pw.moves = pw.moves[:0]
+}
+
+func (pw *Visualizer) GetElementsToDraw() (elements []DrawableElement) {
+	defer pw.elementsToDraw.Unlock()
+	pw.elementsToDraw.Lock()
+
+	elements = append(elements, pw.elementsToDraw.backgrounds...)
+	elements = append(elements, pw.elementsToDraw.brects...)
+	elements = append(elements, pw.elementsToDraw.tfigures...)
+	return
 }
 
 func (pw *Visualizer) drawElements() {
@@ -305,15 +368,7 @@ func (pw *Visualizer) drawElements() {
 
 	pw.handleMoves(texture)
 
-	for _, element := range pw.elementsToDraw.backgrounds {
-		element.Draw(texture)
-	}
-
-	for _, element := range pw.elementsToDraw.brects {
-		element.Draw(texture)
-	}
-
-	for _, element := range pw.elementsToDraw.tfigures {
+	for _, element := range pw.GetElementsToDraw() {
 		element.Draw(texture)
 	}
 

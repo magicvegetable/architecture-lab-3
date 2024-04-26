@@ -1,13 +1,18 @@
 package lang
 
 import (
-	"bufio"
 	"fmt"
 	"io"
-	"strings"
+	"reflect"
+	"regexp"
+	"strconv"
 
-	"github.com/roman-mazur/architecture-lab-3/painter"
+	"bufio"
+	"github.com/magicvegetable/architecture-lab-3/event"
+	"strings"
 )
+
+// Parser уміє прочитати дані з вхідного io.Reader та повернути список операцій представлені вхідним скриптом.
 type Parser struct {
 	savedEventsPool []any
 }
@@ -86,7 +91,7 @@ func GetEvent(command string) (any, error) {
 		}
 
 		return fn(x1, y1, x2, y2), nil
-	
+
 	case event.CreateMove:
 		if lenArgs := len(args); lenArgs < 2 {
 			return nil, fmt.Errorf(
@@ -169,3 +174,4 @@ func (p *Parser) ParseEvents(in io.Reader) ([]any, error) {
 	p.savedEventsPool = append(p.savedEventsPool, parsedEvents[updateToIndex:]...)
 
 	return eventsToApply, nil
+}
