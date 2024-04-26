@@ -11,14 +11,18 @@ import (
 	"strings"
 )
 
+
 type Parser struct {
 	savedOperationsPool []painter.Operation
 }
-
 var table = painter.GetTable()
 
 func GetOperation(command string) (painter.Operation, error) {
 	command = strings.TrimSpace(command)
+
+	if command == "" {
+		return nil, nil
+	}
 
 	args := []string{command}
 	spacex := regexp.MustCompile(`\s+`)
@@ -96,7 +100,7 @@ func GetOperation(command string) (painter.Operation, error) {
 		}
 
 		return fn(x1, y1, x2, y2), nil
-
+	
 	case painter.CreateMove:
 		if lenArgs := len(args); lenArgs != 2 {
 			errMessage := fmt.Sprintf(
@@ -158,12 +162,15 @@ func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
 				return nil, err
 			}
 
+			if op == nil {
+				continue
+			}
+
 			if op == table["update"] {
 				updateToIndex = len(parsedOps)
 				continue
 			}
-
-			if op == table["reset"]{
+			if op == table["reset"] {
 				parsedOps = []painter.Operation{op}
 				updateToIndex = 1
 				continue
