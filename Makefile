@@ -4,7 +4,7 @@ all: build/main
 
 src := cmd/painter/main.go painter/op.go painter/loop.go painter/lang/http.go painter/lang/parser.go ui/window.go
 
-test: *.go
+test:
 	go test ./...
 
 build/main: $(src)

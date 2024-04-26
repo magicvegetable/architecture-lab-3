@@ -163,6 +163,11 @@ func (p *Parser) ParseOperations(in io.Reader) ([]painter.Operation, error) {
 				continue
 			}
 
+			if op == table["reset"]{
+				parsedOps = []painter.Operation{op}
+				updateToIndex = 1
+				continue
+			}
 			parsedOps = append(parsedOps, op)
 		}
 	}

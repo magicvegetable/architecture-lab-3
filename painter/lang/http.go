@@ -11,8 +11,8 @@ import (
 )
 
 func HttpHandler(loop *painter.Loop, p *Parser) http.Handler {
-
 	var parserM, posterM sync.Mutex
+	
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		var in io.Reader = r.Body
 

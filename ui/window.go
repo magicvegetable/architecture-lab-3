@@ -48,21 +48,21 @@ func (mvh *MoveHandler) Unlock() {
 type ElementsToDraw struct {
 	tfigures    []DrawableElement
 	backgrounds []DrawableElement
-	brects      []DrawableElement
+	brect DrawableElement
 
 	tfiguresM    sync.Mutex
 	backgroundsM sync.Mutex
-	brectsM      sync.Mutex
+	brectM      sync.Mutex
 }
 
 func (el *ElementsToDraw) Lock() {
 	el.tfiguresM.Lock()
 	el.backgroundsM.Lock()
-	el.brectsM.Lock()
+	el.brectM.Lock()
 }
 
 func (el *ElementsToDraw) Unlock() {
-	el.brectsM.Unlock()
+	el.brectM.Unlock()
 	el.backgroundsM.Unlock()
 	el.tfiguresM.Unlock()
 }
@@ -304,13 +304,13 @@ func (pw *Visualizer) handlePainterOperation(op painter.Operation) {
 	case painter.TFigure:
 		pw.elementsToDraw.tfigures = append(pw.elementsToDraw.tfigures, &op)
 	case painter.BRect:
-		pw.elementsToDraw.brects = append(pw.elementsToDraw.brects, &op)
+		pw.elementsToDraw.brect = &op
 	case painter.Move:
 		pw.mvHandler.moves = append(pw.mvHandler.moves, &op)
 	case painter.Reset:
 		pw.elementsToDraw.backgrounds = pw.elementsToDraw.backgrounds[:0]
 		pw.elementsToDraw.tfigures = pw.elementsToDraw.tfigures[:0]
-		pw.elementsToDraw.brects = pw.elementsToDraw.brects[:0]
+		pw.elementsToDraw.brect = nil
 	}
 
 	pw.w.Send(paint.Event{})
@@ -379,7 +379,10 @@ func (pw *Visualizer) GetElementsToDraw() (elements []DrawableElement) {
 	pw.elementsToDraw.Lock()
 
 	elements = append(elements, pw.elementsToDraw.backgrounds...)
-	elements = append(elements, pw.elementsToDraw.brects...)
+	
+	if pw.elementsToDraw.brect != nil {
+		elements = append(elements, pw.elementsToDraw.brect)
+	}
 	elements = append(elements, pw.elementsToDraw.tfigures...)
 	return
 }

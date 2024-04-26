@@ -156,8 +156,24 @@ func (brect *BRect) Draw(t screen.Texture) {
 }
 
 func NewBRect(x1, y1, x2, y2 float64) BRect {
-	topLeft := Point{X: x1, Y: y1}
-	botRight := Point{X: x2, Y: y2}
+	var topLeft, botRight Point
+
+	if x1 < x2 {
+		topLeft.X = x1
+		botRight.X = x2
+	} else {
+		topLeft.X = x2
+		botRight.X = x1
+	}
+
+	if y1 < y2 {
+		topLeft.Y = y1
+		botRight.Y = y2
+	} else {
+		topLeft.Y = y2
+		botRight.Y = y1
+	}
+
 	bounds := Rectangle{Min: topLeft, Max: botRight}
 
 	return BRect{
